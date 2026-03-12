@@ -1,0 +1,26 @@
+defaults:
+  update:
+    refresh_package_index: true
+    preview_upgrades: true
+    require_manual_approval: true
+    allow_reboot: false
+hosts:
+  - name: atlas
+    address: 192.168.1.10
+    ssh_user: ubuntu
+    port: 22
+    tags:
+      - core
+      - updates
+    groups:
+      - lab
+  - name: backup
+    address: backup.internal
+    ssh_user: admin
+    port: 2222
+    tags:
+      - storage
+    groups:
+      - backup
+    update:
+      allow_reboot: true
