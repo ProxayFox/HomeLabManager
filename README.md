@@ -57,6 +57,7 @@ Repository-local implementation docs now live under [wiki/](wiki/README.md).
 - See [wiki/development/development-guide.md](wiki/development/development-guide.md) for development and testing conventions.
 - See [wiki/architecture/inventory-model.md](wiki/architecture/inventory-model.md) for inventory structure and selection semantics.
 - See [wiki/development/testing-strategy.md](wiki/development/testing-strategy.md) for spec organization and test doubles.
+- See [wiki/development/phase-1-verification-checklist.md](wiki/development/phase-1-verification-checklist.md) for the current Phase 1 readiness and safe-host verification flow.
 - See [wiki/architecture/cli-behavior.md](wiki/architecture/cli-behavior.md) for command parsing, output modes, and error handling.
 - See [wiki/runtime/update-recovery.md](wiki/runtime/update-recovery.md) for persisted recovery state and resume behavior.
 - See [wiki/runtime/transport-and-ssh.md](wiki/runtime/transport-and-ssh.md) for SSH execution details and transport boundaries.
@@ -66,7 +67,6 @@ Repository-local implementation docs now live under [wiki/](wiki/README.md).
 - See [wiki/operations/inventory-runbook.md](wiki/operations/inventory-runbook.md) for the operator workflow around inventory setup and validation.
 - See [wiki/operations/connectivity-runbook.md](wiki/operations/connectivity-runbook.md) for the SSH verification workflow before update work.
 - See [wiki/operations/update-runbook.md](wiki/operations/update-runbook.md) for the end-to-end update and recovery workflow.
-- See [wiki/operations/quick-start-workflow.md](wiki/operations/quick-start-workflow.md) for the shortest safe operator checklist.
 - See [wiki/operations/troubleshooting.md](wiki/operations/troubleshooting.md) for common failure modes and recovery guidance.
 - See [wiki/development/release-and-build.md](wiki/development/release-and-build.md) for current build, version, and release expectations.
 - See [wiki/development/copilot-customizations.md](wiki/development/copilot-customizations.md) for repository conventions around instructions, prompts, ignored plans, and planning files.
@@ -99,6 +99,14 @@ crystal spec
 ```
 
 `crystal spec` also runs Ameba through [spec/ameba_spec.cr](spec/ameba_spec.cr), so the test pass now includes static analysis.
+
+Run the opt-in safe-host integration check only in a controlled environment:
+
+```sh
+HOMELAB_MANAGER_ENABLE_INTEGRATION_SPECS=1 \
+HOMELAB_MANAGER_INTEGRATION_INVENTORY=/absolute/path/to/integration-inventory.yml \
+crystal spec spec/update_integration_spec.cr
+```
 
 Validate an inventory file before any remote work begins:
 
