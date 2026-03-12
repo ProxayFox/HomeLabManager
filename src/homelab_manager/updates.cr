@@ -74,13 +74,13 @@ module HomeLabManager
   module Updates
     extend self
 
-    def build_plans(inventory : InventoryFile, hosts : Array(Host), approved : Bool) : Array(UpdatePlan)
+    def build_plans(inventory : InventoryFile, hosts : Array(Host), approved : Bool, resume_from : UpdateStepKind? = nil) : Array(UpdatePlan)
       hosts.map do |host|
-        build_plan(host, inventory.defaults, approved)
+        build_plan(host, inventory.defaults, approved, resume_from)
       end
     end
 
-    def build_plan(host : Host, defaults : InventoryDefaults, approved : Bool) : UpdatePlan
+    def build_plan(host : Host, defaults : InventoryDefaults, approved : Bool, resume_from : UpdateStepKind? = nil) : UpdatePlan
       policy = host.effective_update(defaults)
       approval_required = policy.require_manual_approval?
       approval_state = approved || !approval_required ? ApprovalState::Approved : ApprovalState::Pending
@@ -121,7 +121,26 @@ module HomeLabManager
         false,
       )
 
+      if resume_from
+        steps = apply_resume_from(steps, resume_from)
+      end
+
       UpdatePlan.new(host, approval_state, approval_required, steps)
+    end
+
+    def parse_resume_from(value : String) : UpdateStepKind
+      case value
+      when "update_refresh_package_index", "refresh-package-index"
+        UpdateStepKind::RefreshPackageIndex
+      when "update_preview_upgrades", "preview-upgrades"
+        UpdateStepKind::PreviewUpgrades
+      when "update_apply_upgrades", "apply-upgrades"
+        UpdateStepKind::ApplyUpgrades
+      when "update_check_reboot_required", "check-reboot-required"
+        UpdateStepKind::CheckRebootRequired
+      else
+        raise InventoryError.new(["unknown value for --resume-from: #{value}"])
+      end
     end
 
     def dry_run(plans : Array(UpdatePlan), transport : Transport, audit_logger : Audit::Logger = Audit::NullLogger.new, timeout_seconds : Int32 = Transport::DEFAULT_COMMAND_TIMEOUT_SECONDS) : Array(UpdateRun)
@@ -134,6 +153,28 @@ module HomeLabManager
 
     def successful?(runs : Array(UpdateRun)) : Bool
       runs.all?(&.successful?)
+    end
+
+    private def apply_resume_from(steps : Array(UpdateStep), resume_from : UpdateStepKind) : Array(UpdateStep)
+      reached_resume_point = false
+
+      steps.map do |step|
+        if reached_resume_point
+          step
+        elsif step.kind == resume_from
+          reached_resume_point = true
+          step
+        else
+          UpdateStep.new(
+            step.kind,
+            step.label,
+            step.command,
+            step.mutating?,
+            enabled: false,
+            reason: "skipped before resume point",
+          )
+        end
+      end
     end
 
     private def run_plans(plans : Array(UpdatePlan), transport : Transport, audit_logger : Audit::Logger, timeout_seconds : Int32, execute_mutating : Bool) : Array(UpdateRun)

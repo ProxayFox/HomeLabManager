@@ -130,6 +130,15 @@ Execute the full update workflow only when you explicitly opt in:
 ```sh
 shards run homelab_manager -- updates run --approve --execute
 shards run homelab_manager -- updates run --group lab --approve --execute
+shards run homelab_manager -- updates run --group lab --approve --resume-from update_apply_upgrades --execute
+```
+
+Render update plans and runs as JSON:
+
+```sh
+shards run homelab_manager -- updates plan --json
+shards run homelab_manager -- updates dry-run --json
+shards run homelab_manager -- updates run --approve --execute --json
 ```
 
 ## Inventory Format
@@ -216,9 +225,17 @@ Phase 1 now includes the first real mutating runner for approved host updates.
 
 - `updates run` requires `--execute` so mutating actions are never triggered by accident.
 - Hosts that still require approval will keep the upgrade step blocked unless `--approve` is also provided.
+- `--resume-from` lets you skip earlier steps and resume from a specific update action after a partial failure or manual intervention.
 - Per-host execution stops after the first failed step and clearly marks later steps as skipped.
 - Execution output includes per-host overall status, per-step results, and reboot-required reporting when the host check completes.
 - The command exits non-zero when any host run includes a failed step.
+
+Supported `--resume-from` values:
+
+- `update_refresh_package_index`
+- `update_preview_upgrades`
+- `update_apply_upgrades`
+- `update_check_reboot_required`
 
 ## Audit Logging
 
@@ -229,6 +246,14 @@ Audit logging is file-based for the MVP.
 - Runtime logs are ignored by Git.
 - Log entries include timestamp, operator, host, action, approval state, exit status, and sanitized command/result summaries.
 - Sensitive-looking `password=`, `passwd=`, `token=`, and `secret=` values are redacted before being written.
+
+## JSON Output
+
+Update commands now support machine-readable JSON output.
+
+- `updates plan --json` emits the selected hosts, approval state, and planned steps.
+- `updates dry-run --json` and `updates run --json` emit per-host summaries, reboot-required state, and per-step results.
+- Human-readable output remains the default when `--json` is not provided.
 
 ## Project Structure
 
@@ -246,8 +271,8 @@ Audit logging is file-based for the MVP.
 
 ## Next Milestones
 
-1. Extend the mutating runner with safer retry and resume behavior after partial failures.
-2. Add richer operator-facing summaries and possibly machine-readable output for multi-host runs.
+1. Expand retry and resume behavior beyond step-based restarts into safer host-level recovery workflows.
+2. Extend machine-readable output and summaries to more command areas as the CLI surface grows.
 3. Expand audit logging and sanitization rules as more commands and outputs are introduced.
 4. Keep the transport boundary testable while evolving toward broader host-management operations.
 

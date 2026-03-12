@@ -9,7 +9,9 @@ module HomeLabManager
       path : String,
       selection : HostSelection,
       approve : Bool,
-      execute : Bool
+      execute : Bool,
+      resume_from : String?,
+      json : Bool
 
     def run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR, transport : Transport = SshTransport.new, audit_logger : Audit::Logger = Audit::FileLogger.new) : Int32
       return print_help(stdout) if args.empty?
@@ -39,7 +41,7 @@ module HomeLabManager
       io.puts "  homelab_manager hosts check [inventory.yml] [--tag TAG] [--group GROUP]"
       io.puts "  homelab_manager updates plan [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
       io.puts "  homelab_manager updates dry-run [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
-      io.puts "  homelab_manager updates run [inventory.yml] [--tag TAG] [--group GROUP] [--approve] --execute"
+      io.puts "  homelab_manager updates run [inventory.yml] [--tag TAG] [--group GROUP] [--approve] [--resume-from ACTION] --execute"
       io.puts
       io.puts "Commands:"
       io.puts "  inventory validate   Validate the inventory file before any remote action"
@@ -53,9 +55,9 @@ module HomeLabManager
       io.puts "  updates plan         Build a dry-run-first update plan without executing it"
       io.puts "                       Supports repeated --tag and --group filters and optional --approve"
       io.puts "  updates dry-run      Execute only non-mutating update steps and write audit logs"
-      io.puts "                       Supports repeated --tag and --group filters and optional --approve"
+      io.puts "                       Supports repeated --tag and --group filters, optional --approve, and optional --json"
       io.puts "  updates run          Execute the full update workflow, including approved mutating steps"
-      io.puts "                       Requires --execute and supports repeated --tag/--group filters plus optional --approve"
+      io.puts "                       Requires --execute and supports repeated --tag/--group filters, optional --approve, --resume-from ACTION, and --json"
       exit_code
     end
 
@@ -130,7 +132,7 @@ module HomeLabManager
         return 1
       end
 
-      options = parse_command_options(args[1..], allow_approve: true, allow_execute: true)
+      options = parse_command_options(args[1..], allow_approve: true, allow_execute: true, allow_resume_from: true, allow_json: true)
       handle_updates_subcommand(subcommand, options, stdout, stderr, transport, audit_logger)
     rescue ex : InventoryError
       print_inventory_errors(stderr, ex)
@@ -172,8 +174,12 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
-      plans = Updates.build_plans(inventory, hosts, options.approve)
-      print_update_plans(plans, stdout)
+      plans = Updates.build_plans(inventory, hosts, options.approve, parse_resume_from_option(options))
+      if options.json
+        print_update_plans_json(plans, stdout)
+      else
+        print_update_plans(plans, stdout)
+      end
       0
     end
 
@@ -182,9 +188,13 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
-      plans = Updates.build_plans(inventory, hosts, options.approve)
+      plans = Updates.build_plans(inventory, hosts, options.approve, parse_resume_from_option(options))
       runs = Updates.dry_run(plans, transport, audit_logger)
-      print_update_runs("Update dry-run", runs, stdout)
+      if options.json
+        print_update_runs_json("dry-run", runs, stdout)
+      else
+        print_update_runs("Update dry-run", runs, stdout)
+      end
       stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
       Updates.successful?(runs) ? 0 : 1
     end
@@ -200,9 +210,13 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
-      plans = Updates.build_plans(inventory, hosts, options.approve)
+      plans = Updates.build_plans(inventory, hosts, options.approve, parse_resume_from_option(options))
       runs = Updates.execute(plans, transport, audit_logger)
-      print_update_runs("Update run", runs, stdout)
+      if options.json
+        print_update_runs_json("run", runs, stdout)
+      else
+        print_update_runs("Update run", runs, stdout)
+      end
       stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
       Updates.successful?(runs) ? 0 : 1
     end
@@ -286,45 +300,110 @@ module HomeLabManager
       io.puts "Summary: #{succeeded_count} succeeded, #{partial_count} partial, #{failed_count} failed"
     end
 
-    private def parse_command_options(args : Array(String), allow_approve : Bool = false, allow_execute : Bool = false) : CommandOptions
+    private def print_update_plans_json(plans : Array(UpdatePlan), io : IO) : Nil
+      JSON.build(io) do |json|
+        json.object do
+          json.field "type", "update-plan"
+          json.field "hosts" do
+            json.array do
+              plans.each do |plan|
+                json.object do
+                  json.field "host", plan.host.name
+                  json.field "approval_state", plan.approval_state.to_s.downcase
+                  json.field "approval_required", plan.approval_required?
+                  json.field "steps" do
+                    json.array do
+                      plan.steps.each do |step|
+                        json.object do
+                          json.field "kind", step.kind.to_s.underscore
+                          json.field "label", step.label
+                          json.field "command", step.command
+                          json.field "mutating", step.mutating?
+                          json.field "enabled", step.enabled?
+                          json.field "reason", step.reason
+                        end
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+      io.puts
+    end
+
+    private def print_update_runs_json(mode : String, runs : Array(UpdateRun), io : IO) : Nil
+      JSON.build(io) do |json|
+        json.object do
+          json.field "type", "update-#{mode}"
+          json.field "summary" do
+            json.object do
+              json.field "succeeded", runs.count(&.successful?)
+              json.field "partial", runs.count(&.partially_failed?)
+              json.field "failed", runs.size - runs.count(&.successful?) - runs.count(&.partially_failed?)
+            end
+          end
+          json.field "hosts" do
+            json.array do
+              runs.each do |run|
+                json.object do
+                  json.field "host", run.host.name
+                  json.field "overall_status", run.overall_status
+                  json.field "approval_state", run.approval_state.to_s.downcase
+                  json.field "reboot_required", run.reboot_required
+                  json.field "steps" do
+                    json.array do
+                      run.step_results.each do |result|
+                        json.object do
+                          json.field "action", result.action
+                          json.field "status", result.status.to_s.downcase
+                          json.field "approval_state", result.approval_state.to_s.downcase
+                          json.field "exit_code", result.exit_code
+                          json.field "summary", result.summary
+                        end
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+      io.puts
+    end
+
+    private def parse_command_options(args : Array(String), allow_approve : Bool = false, allow_execute : Bool = false, allow_resume_from : Bool = false, allow_json : Bool = false) : CommandOptions
       path = nil
       tags = [] of String
       groups = [] of String
       approve = false
       execute = false
+      resume_from = nil
+      json = false
       index = 0
 
       while index < args.size
         argument = args[index]
 
-        case argument
-        when "--tag"
-          value = args[index + 1]?
-          raise InventoryError.new(["missing value for --tag"]) unless value
-
-          tags << value
-          index += 2
-        when "--group"
-          value = args[index + 1]?
-          raise InventoryError.new(["missing value for --group"]) unless value
-
-          groups << value
-          index += 2
-        when "--approve"
-          raise InventoryError.new(["--approve is not supported for this command"]) unless allow_approve
-
-          approve = true
-          index += 1
-        when "--execute"
-          raise InventoryError.new(["--execute is not supported for this command"]) unless allow_execute
-
-          execute = true
-          index += 1
+        if argument.starts_with?("--")
+          index, resume_from, approve, execute, json = handle_command_flag(
+            args,
+            index,
+            tags,
+            groups,
+            allow_approve,
+            allow_execute,
+            allow_resume_from,
+            allow_json,
+            approve,
+            execute,
+            resume_from,
+            json,
+          )
         else
-          if argument.starts_with?("--")
-            raise InventoryError.new(["unknown option: #{argument}"])
-          end
-
           if path
             raise InventoryError.new(["unexpected argument: #{argument}"])
           end
@@ -334,7 +413,67 @@ module HomeLabManager
         end
       end
 
-      CommandOptions.new(path || DEFAULT_INVENTORY_PATH, HostSelection.new(tags, groups), approve, execute)
+      CommandOptions.new(path || DEFAULT_INVENTORY_PATH, HostSelection.new(tags, groups), approve, execute, resume_from, json)
+    end
+
+    private def handle_command_flag(
+      args : Array(String),
+      index : Int32,
+      tags : Array(String),
+      groups : Array(String),
+      allow_approve : Bool,
+      allow_execute : Bool,
+      allow_resume_from : Bool,
+      allow_json : Bool,
+      approve : Bool,
+      execute : Bool,
+      resume_from : String?,
+      json : Bool,
+    ) : Tuple(Int32, String?, Bool, Bool, Bool)
+      argument = args[index]
+
+      case argument
+      when "--tag"
+        value = require_option_value(args, index, argument)
+        tags << value
+        {index + 2, resume_from, approve, execute, json}
+      when "--group"
+        value = require_option_value(args, index, argument)
+        groups << value
+        {index + 2, resume_from, approve, execute, json}
+      when "--approve"
+        raise InventoryError.new(["--approve is not supported for this command"]) unless allow_approve
+
+        {index + 1, resume_from, true, execute, json}
+      when "--execute"
+        raise InventoryError.new(["--execute is not supported for this command"]) unless allow_execute
+
+        {index + 1, resume_from, approve, true, json}
+      when "--resume-from"
+        raise InventoryError.new(["--resume-from is not supported for this command"]) unless allow_resume_from
+
+        value = require_option_value(args, index, argument)
+        {index + 2, value, approve, execute, json}
+      when "--json"
+        raise InventoryError.new(["--json is not supported for this command"]) unless allow_json
+
+        {index + 1, resume_from, approve, execute, true}
+      else
+        raise InventoryError.new(["unknown option: #{argument}"])
+      end
+    end
+
+    private def require_option_value(args : Array(String), index : Int32, argument : String) : String
+      value = args[index + 1]?
+      raise InventoryError.new(["missing value for #{argument}"]) unless value
+
+      value
+    end
+
+    private def parse_resume_from_option(options : CommandOptions) : UpdateStepKind?
+      return nil unless value = options.resume_from
+
+      Updates.parse_resume_from(value)
     end
 
     private def print_empty_selection(stderr : IO, selection : HostSelection) : Int32
