@@ -4,7 +4,9 @@ name: "HomeLabManager Updates"
 applyTo:
   - "src/homelab_manager/updates.cr"
   - "src/homelab_manager/updates/**/*.cr"
-  - "spec/updates_spec.cr"
+  - "spec/update_planner_spec.cr"
+  - "spec/update_runner_spec.cr"
+  - "spec/update_integration_spec.cr"
   - "spec/update_state_spec.cr"
 ---
 
@@ -18,4 +20,4 @@ applyTo:
 - Recovery state under `state/update-runs.json` should stay machine-readable and host-scoped. Successful reruns should clear stale failed state for that host.
 - Reboot-required detection is normalized from the reboot-check command exit code. Preserve that mapping unless the command contract itself changes.
 - Audit logging is part of the workflow contract. Update-related execution changes should continue to emit sanitized audit entries for each step.
-- Extend or update [spec/updates_spec.cr](../spec/updates_spec.cr) and [spec/update_state_spec.cr](../spec/update_state_spec.cr) alongside behavior changes, especially for approval gates, skipped steps, partial failures, resume points, and persisted state cleanup.
+- Extend or update [spec/update_planner_spec.cr](../spec/update_planner_spec.cr), [spec/update_runner_spec.cr](../spec/update_runner_spec.cr), [spec/update_integration_spec.cr](../spec/update_integration_spec.cr), and [spec/update_state_spec.cr](../spec/update_state_spec.cr) alongside behavior changes, especially for approval gates, skipped steps, partial failures, resume points, and persisted state cleanup.
