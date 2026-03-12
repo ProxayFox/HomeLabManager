@@ -99,4 +99,77 @@ describe HomeLabManager::Updates::StateStore do
       state_store.load.hosts.should be_empty
     end
   end
+
+  it "clears only the recovered host when multiple hosts have persisted state" do
+    with_temp_working_directory do |path|
+      state_store = HomeLabManager::Updates::StateStore.new(File.join(path, "state", "update-runs.json"))
+      inventory = HomeLabManager::Inventory.parse(<<-YAML)
+        hosts:
+          - name: atlas
+            address: 192.168.1.10
+            ssh_user: ubuntu
+          - name: backup
+            address: 192.168.1.11
+            ssh_user: ubuntu
+      YAML
+      atlas = inventory.hosts[0]
+      backup = inventory.hosts[1]
+
+      state_store.record_runs([
+        HomeLabManager::UpdateRun.new(
+          atlas,
+          HomeLabManager::ApprovalState::Approved,
+          [
+            HomeLabManager::ExecutionResult.new(
+              atlas.name,
+              "update_apply_upgrades",
+              HomeLabManager::OperationStatus::Failed,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 100,
+              summary: "atlas failed",
+            ),
+          ],
+          false,
+        ),
+        HomeLabManager::UpdateRun.new(
+          backup,
+          HomeLabManager::ApprovalState::Approved,
+          [
+            HomeLabManager::ExecutionResult.new(
+              backup.name,
+              "update_apply_upgrades",
+              HomeLabManager::OperationStatus::Failed,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 100,
+              summary: "backup failed",
+            ),
+          ],
+          false,
+        ),
+      ])
+
+      state_store.record_runs([
+        HomeLabManager::UpdateRun.new(
+          atlas,
+          HomeLabManager::ApprovalState::Approved,
+          [
+            HomeLabManager::ExecutionResult.new(
+              atlas.name,
+              "update_apply_upgrades",
+              HomeLabManager::OperationStatus::Succeeded,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 0,
+              summary: "atlas recovered",
+            ),
+          ],
+          false,
+        ),
+      ])
+
+      state_store.resume_points([atlas, backup]).keys.should eq([backup.name])
+      state_store.recovery_entries([atlas, backup]).keys.should eq([backup.name])
+      File.read(state_store.path).should contain("backup")
+      File.read(state_store.path).should_not contain("atlas failed")
+    end
+  end
 end

@@ -36,13 +36,23 @@ def with_temp_working_directory(&)
 end
 
 class FakeTransport < HomeLabManager::Transport
+  record ProbeInvocation, host_name : String, timeout_seconds : Int32
+  record CommandInvocation, host_name : String, action : String, command : String, timeout_seconds : Int32
+
+  getter probe_invocations : Array(ProbeInvocation)
+  getter command_invocations : Array(CommandInvocation)
+
   def initialize(
     @probe_results : Hash(String, HomeLabManager::ExecutionResult) = {} of String => HomeLabManager::ExecutionResult,
     @command_results : Hash(String, HomeLabManager::ExecutionResult) = {} of String => HomeLabManager::ExecutionResult,
+    @probe_invocations : Array(ProbeInvocation) = [] of ProbeInvocation,
+    @command_invocations : Array(CommandInvocation) = [] of CommandInvocation,
   )
   end
 
   def probe(host : HomeLabManager::Host, timeout_seconds : Int32 = DEFAULT_CONNECT_TIMEOUT_SECONDS) : HomeLabManager::ExecutionResult
+    @probe_invocations << ProbeInvocation.new(host.name, timeout_seconds)
+
     @probe_results[host.name]? || HomeLabManager::ExecutionResult.new(
       host.name,
       "connectivity_check",
@@ -53,6 +63,8 @@ class FakeTransport < HomeLabManager::Transport
   end
 
   def run_command(host : HomeLabManager::Host, action : String, command : String, timeout_seconds : Int32 = DEFAULT_COMMAND_TIMEOUT_SECONDS) : HomeLabManager::ExecutionResult
+    @command_invocations << CommandInvocation.new(host.name, action, command, timeout_seconds)
+
     @command_results["#{host.name}|#{action}"]? || HomeLabManager::ExecutionResult.new(
       host.name,
       action,
