@@ -59,6 +59,10 @@ Repository-local implementation docs now live under [wiki/](wiki/README.md).
 - See [wiki/testing-strategy.md](wiki/testing-strategy.md) for spec organization and test doubles.
 - See [wiki/cli-behavior.md](wiki/cli-behavior.md) for command parsing, output modes, and error handling.
 - See [wiki/update-recovery.md](wiki/update-recovery.md) for persisted recovery state and resume behavior.
+- See [wiki/transport-and-ssh.md](wiki/transport-and-ssh.md) for SSH execution details and transport boundaries.
+- See [wiki/audit-logging.md](wiki/audit-logging.md) for audit log format and sanitization rules.
+- See [wiki/contributor-workflow.md](wiki/contributor-workflow.md) for how to extend the repo safely.
+- See [wiki/json-output-reference.md](wiki/json-output-reference.md) for CLI JSON payload shapes.
 
 ## Common Commands
 
