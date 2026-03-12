@@ -150,6 +150,27 @@ describe HomeLabManager::CLI do
     end
   end
 
+  it "renders inventory validation failures as json" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: ""
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["inventory", "validate", path, "--json"], stdout, stderr)
+
+      exit_code.should eq(1)
+      stdout.to_s.should eq("")
+      stderr.to_s.should contain("\"type\":\"error\"")
+      stderr.to_s.should contain("\"category\":\"inventory-validation\"")
+      stderr.to_s.should contain("\"command\":\"inventory\"")
+      stderr.to_s.should contain("hosts[0].name must not be blank")
+    end
+  end
+
   it "checks host connectivity through the transport boundary" do
     with_temp_inventory <<-YAML do |path|
       hosts:
@@ -293,6 +314,28 @@ describe HomeLabManager::CLI do
     end
   end
 
+  it "renders empty host selection as json" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          groups: [lab]
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      transport = FakeTransport.new
+
+      exit_code = HomeLabManager::CLI.run(["hosts", "check", path, "--group", "missing", "--json"], stdout, stderr, transport)
+
+      exit_code.should eq(1)
+      stdout.to_s.should eq("")
+      stderr.to_s.should contain("\"category\":\"selection\"")
+      stderr.to_s.should contain("\"command\":\"hosts\"")
+      stderr.to_s.should contain("no hosts matched the requested filters")
+    end
+  end
+
   it "prints an approval-gated update plan" do
     with_temp_inventory <<-YAML do |path|
       hosts:
@@ -420,6 +463,39 @@ describe HomeLabManager::CLI do
       exit_code.should eq(1)
       stderr.to_s.should contain("Refusing to run mutating updates without --execute")
     end
+  end
+
+  it "renders execution guard failures as json" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["updates", "run", path, "--json"], stdout, stderr)
+
+      exit_code.should eq(1)
+      stdout.to_s.should eq("")
+      stderr.to_s.should contain("\"category\":\"execution-guard\"")
+      stderr.to_s.should contain("\"subcommand\":\"run\"")
+      stderr.to_s.should contain("Refusing to run mutating updates without --execute")
+    end
+  end
+
+  it "renders unknown commands as json" do
+    stdout = IO::Memory.new
+    stderr = IO::Memory.new
+
+    exit_code = HomeLabManager::CLI.run(["bogus", "--json"], stdout, stderr)
+
+    exit_code.should eq(1)
+    stdout.to_s.should eq("")
+    stderr.to_s.should contain("\"category\":\"usage\"")
+    stderr.to_s.should contain("unknown command: bogus")
+    stderr.to_s.should_not contain("HomeLabManager")
   end
 
   it "supports resume-from on update execution" do

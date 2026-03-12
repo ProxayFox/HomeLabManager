@@ -24,6 +24,8 @@ module HomeLabManager
     ) : Int32
       return print_help(stdout) if args.empty?
 
+      json = json_requested?(args)
+
       case args[0]
       when "help", "--help", "-h"
         print_help(stdout)
@@ -34,7 +36,9 @@ module HomeLabManager
       when "updates"
         run_updates(args[1..], stdout, stderr, transport, audit_logger, state_store)
       else
-        stderr.puts "Unknown command: #{args[0]}"
+        print_error(stderr, ["unknown command: #{args[0]}"], json, "usage")
+        return 1 if json
+
         stderr.puts
         print_help(stderr, 1)
       end
@@ -72,10 +76,10 @@ module HomeLabManager
 
     private def run_inventory(args : Array(String), stdout : IO, stderr : IO) : Int32
       subcommand = args[0]?
+      json = json_requested?(args)
 
       unless subcommand
-        stderr.puts "Missing inventory subcommand"
-        stderr.puts "Expected one of: validate, list"
+        print_error(stderr, ["missing inventory subcommand", "expected one of: validate, list"], json, "usage", command: "inventory")
         return 1
       end
 
@@ -92,7 +96,7 @@ module HomeLabManager
         0
       when "list"
         hosts = Inventory.select_hosts(inventory, options.selection)
-        return print_empty_selection(stderr, options.selection) if hosts.empty?
+        return print_empty_selection(stderr, options.selection, options.json, "inventory", subcommand) if hosts.empty?
 
         if options.json
           print_inventory_list_json(options.path, inventory, hosts, options.selection, stdout)
@@ -101,21 +105,20 @@ module HomeLabManager
         end
         0
       else
-        stderr.puts "Unknown inventory subcommand: #{subcommand}"
-        stderr.puts "Expected one of: validate, list"
+        print_error(stderr, ["unknown inventory subcommand: #{subcommand}", "expected one of: validate, list"], options.json, "usage", command: "inventory", subcommand: subcommand)
         1
       end
     rescue ex : InventoryError
-      print_inventory_errors(stderr, ex)
+      print_inventory_errors(stderr, ex, json_requested?(args), command: "inventory", subcommand: subcommand)
       1
     end
 
     private def run_hosts(args : Array(String), stdout : IO, stderr : IO, transport : Transport) : Int32
       subcommand = args[0]?
+      json = json_requested?(args)
 
       unless subcommand
-        stderr.puts "Missing hosts subcommand"
-        stderr.puts "Expected: check"
+        print_error(stderr, ["missing hosts subcommand", "expected: check"], json, "usage", command: "hosts")
         return 1
       end
 
@@ -125,7 +128,7 @@ module HomeLabManager
       when "check"
         inventory = Inventory.load(options.path)
         hosts = Inventory.select_hosts(inventory, options.selection)
-        return print_empty_selection(stderr, options.selection) if hosts.empty?
+        return print_empty_selection(stderr, options.selection, options.json, "hosts", subcommand) if hosts.empty?
 
         results = Connectivity.check(InventoryFile.new(inventory.defaults, hosts), transport, DEFAULT_CONNECT_TIMEOUT_SECONDS)
         if options.json
@@ -135,28 +138,27 @@ module HomeLabManager
         end
         Connectivity.succeeded?(results) ? 0 : 1
       else
-        stderr.puts "Unknown hosts subcommand: #{subcommand}"
-        stderr.puts "Expected: check"
+        print_error(stderr, ["unknown hosts subcommand: #{subcommand}", "expected: check"], options.json, "usage", command: "hosts", subcommand: subcommand)
         1
       end
     rescue ex : InventoryError
-      print_inventory_errors(stderr, ex)
+      print_inventory_errors(stderr, ex, json_requested?(args), command: "hosts", subcommand: subcommand)
       1
     end
 
     private def run_updates(args : Array(String), stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger, state_store : Updates::StateStore) : Int32
       subcommand = args[0]?
+      json = json_requested?(args)
 
       unless subcommand
-        stderr.puts "Missing updates subcommand"
-        stderr.puts "Expected: plan"
+        print_error(stderr, ["missing updates subcommand", "expected: plan, dry-run, run"], json, "usage", command: "updates")
         return 1
       end
 
       options = parse_command_options(args[1..], allow_approve: true, allow_execute: true, allow_resume_from: true, allow_json: true)
       handle_updates_subcommand(subcommand, options, stdout, stderr, transport, audit_logger, state_store)
     rescue ex : InventoryError
-      print_inventory_errors(stderr, ex)
+      print_inventory_errors(stderr, ex, json_requested?(args), command: "updates", subcommand: subcommand)
       1
     end
 
@@ -177,8 +179,7 @@ module HomeLabManager
       when "run"
         run_updates_execute(options, stdout, stderr, transport, audit_logger, state_store)
       else
-        stderr.puts "Unknown updates subcommand: #{subcommand}"
-        stderr.puts "Expected: plan, dry-run, run"
+        print_error(stderr, ["unknown updates subcommand: #{subcommand}", "expected: plan, dry-run, run"], options.json, "usage", command: "updates", subcommand: subcommand)
         1
       end
     end
@@ -186,7 +187,7 @@ module HomeLabManager
     private def load_selected_hosts(options : CommandOptions, stderr : IO) : Tuple(InventoryFile, Array(Host))?
       inventory = Inventory.load(options.path)
       hosts = Inventory.select_hosts(inventory, options.selection)
-      return nil if hosts.empty? && print_empty_selection(stderr, options.selection) == 1
+      return nil if hosts.empty? && print_empty_selection(stderr, options.selection, options.json, "updates") == 1
 
       {inventory, hosts}
     end
@@ -223,8 +224,17 @@ module HomeLabManager
 
     private def run_updates_execute(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger, state_store : Updates::StateStore) : Int32
       unless options.execute
-        stderr.puts "Refusing to run mutating updates without --execute"
-        stderr.puts "Use updates plan or updates dry-run first, then rerun with --execute when ready"
+        print_error(
+          stderr,
+          [
+            "Refusing to run mutating updates without --execute",
+            "Use updates plan or updates dry-run first, then rerun with --execute when ready",
+          ],
+          options.json,
+          "execution-guard",
+          command: "updates",
+          subcommand: "run",
+        )
         return 1
       end
 
@@ -643,18 +653,16 @@ module HomeLabManager
       end
     end
 
-    private def print_empty_selection(stderr : IO, selection : HostSelection) : Int32
-      stderr.puts "No hosts matched the requested filters"
-      stderr.puts "Tags: #{selection.tags.join(",")}" unless selection.tags.empty?
-      stderr.puts "Groups: #{selection.groups.join(",")}" unless selection.groups.empty?
+    private def print_empty_selection(stderr : IO, selection : HostSelection, json : Bool = false, command : String? = nil, subcommand : String? = nil) : Int32
+      errors = ["no hosts matched the requested filters"] of String
+      errors << "tags: #{selection.tags.join(",")}" unless selection.tags.empty?
+      errors << "groups: #{selection.groups.join(",")}" unless selection.groups.empty?
+      print_error(stderr, errors, json, "selection", command: command, subcommand: subcommand)
       1
     end
 
-    private def print_inventory_errors(stderr : IO, error : InventoryError) : Nil
-      stderr.puts "Inventory validation failed:"
-      error.errors.each do |entry|
-        stderr.puts "- #{entry}"
-      end
+    private def print_inventory_errors(stderr : IO, error : InventoryError, json : Bool = false, command : String? = nil, subcommand : String? = nil) : Nil
+      print_error(stderr, error.errors, json, "inventory-validation", command: command, subcommand: subcommand, heading: "Inventory validation failed:")
     end
   end
 end
