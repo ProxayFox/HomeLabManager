@@ -11,6 +11,29 @@ def with_temp_inventory(contents : String, &)
   end
 end
 
+def with_temp_working_directory(&)
+  path = File.tempname("homelab-manager-dir")
+  File.delete(path) if File.exists?(path)
+  Dir.mkdir(path)
+
+  previous = Dir.current
+
+  begin
+    Dir.cd(path)
+    yield path
+  ensure
+    Dir.cd(previous)
+    Dir.glob(File.join(path, "**", "*")).sort.reverse_each do |entry|
+      if File.directory?(entry)
+        Dir.delete(entry)
+      else
+        File.delete(entry)
+      end
+    end
+    Dir.delete(path) if Dir.exists?(path)
+  end
+end
+
 describe HomeLabManager do
   it "exposes the project version" do
     HomeLabManager::VERSION.should eq("0.1.0")
@@ -108,6 +131,30 @@ describe HomeLabManager::CLI do
       exit_code.should eq(0)
       stdout.to_s.should contain("- atlas")
       stdout.to_s.should contain("update.allow_reboot: false")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "defaults inventory commands to config/inventory.yml" do
+    with_temp_working_directory do |path|
+      Dir.mkdir(File.join(path, "config"))
+      File.write(
+        File.join(path, HomeLabManager::CLI::DEFAULT_INVENTORY_PATH),
+        <<-YAML
+          hosts:
+            - name: atlas
+              address: 192.168.1.10
+              ssh_user: ubuntu
+        YAML
+      )
+
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["inventory", "validate"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain(HomeLabManager::CLI::DEFAULT_INVENTORY_PATH)
       stderr.to_s.should eq("")
     end
   end

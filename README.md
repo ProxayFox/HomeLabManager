@@ -78,13 +78,13 @@ Validate an inventory file before any remote work begins:
 
 ```sh
 cp config/inventory.example.yml config/inventory.yml
-shards run homelab_manager -- inventory validate config/inventory.yml
+shards run homelab_manager -- inventory validate
 ```
 
 List the hosts defined in an inventory file:
 
 ```sh
-shards run homelab_manager -- inventory list config/inventory.yml
+shards run homelab_manager -- inventory list
 ```
 
 ## Inventory Format
@@ -96,6 +96,7 @@ Recommended location:
 - Keep the operator-managed inventory at `config/inventory.yml`.
 - Start from the tracked template at `config/inventory.example.yml`.
 - `config/inventory.yml` is ignored by Git so real host details are not committed to the remote.
+- Inventory commands default to `config/inventory.yml`, but you can still pass an explicit path when needed.
 
 Example:
 

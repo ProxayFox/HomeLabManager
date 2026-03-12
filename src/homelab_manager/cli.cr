@@ -2,6 +2,8 @@ module HomeLabManager
   module CLI
     extend self
 
+    DEFAULT_INVENTORY_PATH = "config/inventory.yml"
+
     def run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR) : Int32
       return print_help(stdout) if args.empty?
 
@@ -21,28 +23,24 @@ module HomeLabManager
       io.puts "HomeLabManager"
       io.puts
       io.puts "Usage:"
-      io.puts "  homelab_manager inventory validate <inventory.yml>"
-      io.puts "  homelab_manager inventory list <inventory.yml>"
+      io.puts "  homelab_manager inventory validate [inventory.yml]"
+      io.puts "  homelab_manager inventory list [inventory.yml]"
       io.puts
       io.puts "Commands:"
       io.puts "  inventory validate   Validate the inventory file before any remote action"
+      io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH}"
       io.puts "  inventory list       List the hosts defined in the inventory file"
+      io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH}"
       exit_code
     end
 
     private def run_inventory(args : Array(String), stdout : IO, stderr : IO) : Int32
       subcommand = args[0]?
-      path = args[1]?
+      path = args[1]? || DEFAULT_INVENTORY_PATH
 
       unless subcommand
         stderr.puts "Missing inventory subcommand"
         stderr.puts "Expected one of: validate, list"
-        return 1
-      end
-
-      unless path
-        stderr.puts "Missing inventory file path"
-        stderr.puts "Usage: homelab_manager inventory #{subcommand} <inventory.yml>"
         return 1
       end
 
