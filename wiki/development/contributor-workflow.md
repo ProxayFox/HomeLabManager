@@ -45,10 +45,10 @@ Use this sequence when adding or changing a command.
 Update workflow changes need extra discipline because this part of the project carries the main safety guarantees.
 
 1. Add the step to `UpdateStepKind` in [src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr).
-2. Add the step to the planner in `Updates.build_plan` with the right mutating flag and enablement logic.
+2. Add the step to the planner in [src/homelab_manager/updates/planner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/planner.cr) with the right mutating flag and enablement logic.
 3. Update `Updates.parse_resume_from` if the step needs resume support.
-4. Update `action_name` so step results and recovery state use a stable action identifier.
-5. Extend the relevant specs in [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr), [spec/cli_updates_spec.cr](/workspaces/HomeLabManager/spec/cli_updates_spec.cr), or [spec/update_state_spec.cr](/workspaces/HomeLabManager/spec/update_state_spec.cr).
+4. Update `action_name` in [src/homelab_manager/updates/runner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/runner.cr) so step results and recovery state use a stable action identifier.
+5. Extend the relevant specs in [spec/update_planner_spec.cr](/workspaces/HomeLabManager/spec/update_planner_spec.cr), [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr), [spec/cli_updates_spec.cr](/workspaces/HomeLabManager/spec/cli_updates_spec.cr), or [spec/update_state_spec.cr](/workspaces/HomeLabManager/spec/update_state_spec.cr).
 6. Recheck that dry-run remains non-mutating and that `updates run` still requires `--execute`.
 
 ## Working with Output
@@ -68,7 +68,9 @@ This repo expects focused specs, not a single oversized catch-all file.
 - [spec/cli_inventory_spec.cr](/workspaces/HomeLabManager/spec/cli_inventory_spec.cr): inventory command behavior.
 - [spec/cli_hosts_spec.cr](/workspaces/HomeLabManager/spec/cli_hosts_spec.cr): host connectivity command behavior.
 - [spec/cli_updates_spec.cr](/workspaces/HomeLabManager/spec/cli_updates_spec.cr): update command behavior and output.
-- [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr): planner and runner semantics.
+- [spec/update_planner_spec.cr](/workspaces/HomeLabManager/spec/update_planner_spec.cr): planner semantics and resume alias handling.
+- [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr): runner semantics, timeout propagation, and audit coverage.
+- [spec/update_integration_spec.cr](/workspaces/HomeLabManager/spec/update_integration_spec.cr): opt-in real-transport verification in a safe environment.
 - [spec/update_state_spec.cr](/workspaces/HomeLabManager/spec/update_state_spec.cr): persisted recovery state.
 
 Use `FakeTransport` from [spec/spec_helper.cr](/workspaces/HomeLabManager/spec/spec_helper.cr) whenever SSH outcomes matter.

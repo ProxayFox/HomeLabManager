@@ -5,8 +5,8 @@ HomeLabManager is a Crystal console application built around a narrow CLI and a 
 ## Runtime Entry
 
 - [src/homelab_manager.cr](/workspaces/HomeLabManager/src/homelab_manager.cr) is the executable entrypoint.
-- [src/homelab_manager/app.cr](/workspaces/HomeLabManager/src/homelab_manager/app.cr) loads the application modules and defines `HomeLabManager::VERSION`.
-- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr) is the main orchestration layer for command parsing, validation, output formatting, and dispatch.
+- [src/homelab_manager/app.cr](/workspaces/HomeLabManager/src/homelab_manager/app.cr) loads the application modules, including the split CLI helpers and split update modules, and defines `HomeLabManager::VERSION`.
+- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr) remains the main orchestration layer for command dispatch and command-family flow.
 
 ## Core Modules
 
@@ -51,7 +51,11 @@ This keeps the read-only connectivity command narrow and makes its behavior easy
 
 ### Updates
 
-[src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr) contains the update planning and execution model.
+The update workflow is now split across a shared type file and focused planner/runner modules.
+
+- [src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr) holds the shared update domain types such as `UpdateStep`, `UpdatePlan`, and `UpdateRun`.
+- [src/homelab_manager/updates/planner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/planner.cr) builds plans, handles approval gating, and parses resume aliases.
+- [src/homelab_manager/updates/runner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/runner.cr) executes dry runs and real runs, normalizes reboot-required results, and manages per-host failure flow.
 
 - `UpdateStepKind` names the supported workflow stages.
 - `UpdateStep` describes one remote action, whether it mutates state, and whether it is currently enabled.
@@ -92,6 +96,15 @@ Audit logging is deliberately separate from transport execution so the app can e
 
 [src/homelab_manager/cli/error_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/error_output.cr) holds shared error formatting used by the CLI, including structured JSON error output when `--json` is requested.
 
+### CLI Helpers
+
+The CLI is now split into focused helpers under [src/homelab_manager/cli/](/workspaces/HomeLabManager/src/homelab_manager/cli).
+
+- [src/homelab_manager/cli/options.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/options.cr) contains shared option parsing.
+- [src/homelab_manager/cli/inventory_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/inventory_output.cr) renders inventory text and JSON output.
+- [src/homelab_manager/cli/hosts_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/hosts_output.cr) renders connectivity text and JSON output.
+- [src/homelab_manager/cli/update_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/update_output.cr) renders update text and JSON output.
+
 ## Design Characteristics
 
 - Thin CLI, explicit modules: commands are dispatched centrally, then handed to focused modules.
@@ -105,8 +118,12 @@ Audit logging is deliberately separate from transport execution so the app can e
 The test suite under [spec/](/workspaces/HomeLabManager/spec) mirrors the major concerns of the source tree.
 
 - [spec/cli_inventory_spec.cr](/workspaces/HomeLabManager/spec/cli_inventory_spec.cr), [spec/cli_hosts_spec.cr](/workspaces/HomeLabManager/spec/cli_hosts_spec.cr), and [spec/cli_updates_spec.cr](/workspaces/HomeLabManager/spec/cli_updates_spec.cr) cover the split CLI command families, output paths, and execution guards.
-- [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr) covers planning, dry-run behavior, approval, failure handling, and audit logging.
+- [spec/update_planner_spec.cr](/workspaces/HomeLabManager/spec/update_planner_spec.cr) covers update plan construction and resume-point parsing.
+- [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr) covers dry-run behavior, execution semantics, timeout propagation, failure handling, and audit logging.
+- [spec/update_integration_spec.cr](/workspaces/HomeLabManager/spec/update_integration_spec.cr) provides an opt-in safe-host integration harness for the real SSH transport.
 - [spec/update_state_spec.cr](/workspaces/HomeLabManager/spec/update_state_spec.cr) covers persisted recovery behavior.
 - [spec/homelab_manager_spec.cr](/workspaces/HomeLabManager/spec/homelab_manager_spec.cr) covers core inventory and version behavior.
+
+The pages under [wiki/development/](/workspaces/HomeLabManager/wiki/development) and [wiki/operations/](/workspaces/HomeLabManager/wiki/operations) are the supporting human-facing documentation for these source and spec boundaries.
 
 If you are changing behavior, the nearest focused spec file is usually the correct place to extend first.

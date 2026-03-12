@@ -208,3 +208,5 @@ shards run homelab_manager -- updates run --approve --execute --json
 ```
 
 The payload shapes are documented in [JSON Output Reference](../reference/json-output-reference.md).
+
+For the broader readiness flow that combines local checks with safe-host verification, use [Phase 1 Verification Checklist](../development/phase-1-verification-checklist.md).

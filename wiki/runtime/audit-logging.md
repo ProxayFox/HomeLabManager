@@ -2,7 +2,7 @@
 
 HomeLabManager writes structured audit entries for update execution so operators can review what happened without depending on terminal scrollback.
 
-The implementation lives in [src/homelab_manager/audit.cr](/workspaces/HomeLabManager/src/homelab_manager/audit.cr). Audit behavior is exercised by specs in [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr).
+The implementation lives in [src/homelab_manager/audit.cr](/workspaces/HomeLabManager/src/homelab_manager/audit.cr). Audit behavior is exercised by specs in [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr).
 
 ## Logger Types
 
@@ -99,7 +99,7 @@ Keeping them separate avoids treating a human-auditable log as the system's sour
 
 ## Test Coverage
 
-The main audit logging behavior is covered in [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr), which verifies that:
+The main audit logging behavior is covered in [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr), which verifies that:
 
 - dry-run execution writes log entries,
 - secret-like values such as `token=abc123` are redacted,

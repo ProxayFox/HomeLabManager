@@ -58,6 +58,8 @@ In this repository, `crystal spec` covers more than behavior specs. It also incl
 
 That means the standard verification flow checks both code behavior and repository conventions.
 
+For the current Phase 1 readiness flow, use [Phase 1 Verification Checklist](phase-1-verification-checklist.md) as the canonical sequence for local verification plus safe-host dry-run checks.
+
 ## When to Change the Version
 
 The current project version is defined in two places:
@@ -78,6 +80,7 @@ The repository does not yet define a formal tagged-release process, but the mini
 3. Confirm the version is correct in `shard.yml` and `src/homelab_manager/app.cr`.
 4. Review documentation changes that affect operator-facing workflows.
 5. Build the final binary and verify its expected location under `bin/`.
+6. If Phase 1 update behavior changed, run the opt-in safe-host integration check from [Phase 1 Verification Checklist](phase-1-verification-checklist.md).
 
 ## Current Constraints
 

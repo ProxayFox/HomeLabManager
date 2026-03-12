@@ -17,7 +17,9 @@ The current spec files are organized around the major source modules.
 - [spec/cli_inventory_spec.cr](/workspaces/HomeLabManager/spec/cli_inventory_spec.cr): inventory command parsing, output modes, and exit codes.
 - [spec/cli_hosts_spec.cr](/workspaces/HomeLabManager/spec/cli_hosts_spec.cr): connectivity command parsing, host-selection failures, and output modes.
 - [spec/cli_updates_spec.cr](/workspaces/HomeLabManager/spec/cli_updates_spec.cr): update command parsing, output modes, resume context, and execution guards.
-- [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr): plan construction, dry-run semantics, approval state, failure handling, and audit logging.
+- [spec/update_planner_spec.cr](/workspaces/HomeLabManager/spec/update_planner_spec.cr): plan construction and resume alias parsing.
+- [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr): dry-run semantics, approval state, failure handling, timeout propagation, and audit logging.
+- [spec/update_integration_spec.cr](/workspaces/HomeLabManager/spec/update_integration_spec.cr): opt-in safe-host execution harness using the real SSH transport and an operator-supplied integration inventory.
 - [spec/update_state_spec.cr](/workspaces/HomeLabManager/spec/update_state_spec.cr): persisted resume data and recovery behavior.
 - [spec/ameba_spec.cr](/workspaces/HomeLabManager/spec/ameba_spec.cr): lint enforcement through Ameba.
 - [spec/file_length_spec.cr](/workspaces/HomeLabManager/spec/file_length_spec.cr): repository rule that source and spec files stay within the file-length limit.
@@ -31,6 +33,7 @@ Important helpers include:
 - `with_temp_inventory`: writes a temporary YAML inventory file for CLI-oriented tests.
 - `with_temp_working_directory`: creates an isolated directory so tests can exercise default paths like `config/inventory.yml` or `logs/audit.log` safely.
 - `FakeTransport`: replaces the real SSH transport with deterministic in-memory results.
+- `FakeTransport` also records probe and command invocations so specs can verify step ordering and timeout propagation without real hosts.
 
 ## Why `FakeTransport` Matters
 
@@ -44,6 +47,17 @@ The real implementation in [src/homelab_manager/transport.cr](/workspaces/HomeLa
 - safe to run inside CI or a devcontainer.
 
 Because the CLI and update modules accept a `Transport` instance, tests can inject `FakeTransport` directly without special hooks or monkey patching.
+
+## Opt-In Integration Coverage
+
+The repository now also has a small real-transport harness in [spec/update_integration_spec.cr](/workspaces/HomeLabManager/spec/update_integration_spec.cr).
+
+It is disabled by default and only runs when both of these environment variables are set:
+
+- `HOMELAB_MANAGER_ENABLE_INTEGRATION_SPECS=1`
+- `HOMELAB_MANAGER_INTEGRATION_INVENTORY=/absolute/path/to/integration-inventory.yml`
+
+Use it only with a safe staging inventory. It exists to verify that the production `SshTransport` can execute the non-mutating update path against real hosts without making the standard spec suite unsafe or flaky.
 
 ## What the Specs Protect
 

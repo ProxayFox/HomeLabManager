@@ -24,11 +24,17 @@ crystal spec
 
 ## Source Layout
 
-- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr): command parsing and output orchestration.
+- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr): command dispatch and update-flow orchestration.
+- [src/homelab_manager/cli/options.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/options.cr): shared command option parsing.
+- [src/homelab_manager/cli/inventory_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/inventory_output.cr): inventory text and JSON rendering.
+- [src/homelab_manager/cli/hosts_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/hosts_output.cr): connectivity text and JSON rendering.
+- [src/homelab_manager/cli/update_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/update_output.cr): update text and JSON rendering.
 - [src/homelab_manager/inventory.cr](/workspaces/HomeLabManager/src/homelab_manager/inventory.cr): YAML-backed inventory model and validation.
 - [src/homelab_manager/transport.cr](/workspaces/HomeLabManager/src/homelab_manager/transport.cr): transport abstraction and SSH implementation.
 - [src/homelab_manager/connectivity.cr](/workspaces/HomeLabManager/src/homelab_manager/connectivity.cr): read-only host probe behavior.
-- [src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr): update planning and execution.
+- [src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr): shared update workflow types.
+- [src/homelab_manager/updates/planner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/planner.cr): update plan construction and resume-point parsing.
+- [src/homelab_manager/updates/runner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/runner.cr): dry-run and execution semantics.
 - [src/homelab_manager/updates/state.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/state.cr): persisted recovery state.
 - [src/homelab_manager/audit.cr](/workspaces/HomeLabManager/src/homelab_manager/audit.cr): audit log writing and sanitization.
 
@@ -37,7 +43,9 @@ crystal spec
 - [spec/cli_inventory_spec.cr](/workspaces/HomeLabManager/spec/cli_inventory_spec.cr): inventory command behavior and output.
 - [spec/cli_hosts_spec.cr](/workspaces/HomeLabManager/spec/cli_hosts_spec.cr): connectivity command behavior and output.
 - [spec/cli_updates_spec.cr](/workspaces/HomeLabManager/spec/cli_updates_spec.cr): update command behavior, JSON output, and execution guards.
-- [spec/updates_spec.cr](/workspaces/HomeLabManager/spec/updates_spec.cr): update planning and execution semantics.
+- [spec/update_planner_spec.cr](/workspaces/HomeLabManager/spec/update_planner_spec.cr): plan construction and resume alias handling.
+- [spec/update_runner_spec.cr](/workspaces/HomeLabManager/spec/update_runner_spec.cr): dry-run, execution, timeout propagation, and audit coverage.
+- [spec/update_integration_spec.cr](/workspaces/HomeLabManager/spec/update_integration_spec.cr): opt-in safe-host integration coverage for the real SSH transport.
 - [spec/update_state_spec.cr](/workspaces/HomeLabManager/spec/update_state_spec.cr): recovery persistence.
 - [spec/homelab_manager_spec.cr](/workspaces/HomeLabManager/spec/homelab_manager_spec.cr): version and inventory behavior.
 - [spec/spec_helper.cr](/workspaces/HomeLabManager/spec/spec_helper.cr): shared helpers and test doubles such as `FakeTransport`.

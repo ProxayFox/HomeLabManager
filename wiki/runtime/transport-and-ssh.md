@@ -96,6 +96,10 @@ That keeps transport-dependent tests:
 - independent of network state,
 - safe inside CI and the devcontainer.
 
+The fake transport also records command invocations, which lets the runner specs verify step ordering and timeout propagation without using real SSH hosts.
+
+For a controlled real-host check, the repository also provides [spec/update_integration_spec.cr](/workspaces/HomeLabManager/spec/update_integration_spec.cr). That harness is opt-in and only runs when the operator supplies an explicit integration inventory path through environment variables.
+
 ## Current Constraints
 
 The current transport layer is intentionally small and has some known limits:
