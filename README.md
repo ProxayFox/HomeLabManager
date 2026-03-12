@@ -89,10 +89,32 @@ List the hosts defined in an inventory file:
 shards run homelab_manager -- inventory list
 ```
 
+Limit inventory output to a specific tag or group:
+
+```sh
+shards run homelab_manager -- inventory list --tag core
+shards run homelab_manager -- inventory list --group lab
+```
+
 Run a non-mutating SSH connectivity check across the inventory:
 
 ```sh
 shards run homelab_manager -- hosts check
+```
+
+Limit connectivity checks to a selected subset of hosts:
+
+```sh
+shards run homelab_manager -- hosts check --tag core
+shards run homelab_manager -- hosts check --group lab
+```
+
+Build an approval-aware update plan without executing any remote changes:
+
+```sh
+shards run homelab_manager -- updates plan
+shards run homelab_manager -- updates plan --tag updates
+shards run homelab_manager -- updates plan --approve
 ```
 
 ## Inventory Format
@@ -138,6 +160,14 @@ Current validation rules:
 - Inventory validation must succeed before later SSH-based features are allowed to run.
 - Copy `config/inventory.example.yml` to `config/inventory.yml` before adding real host data.
 
+Inventory selection rules:
+
+- `inventory list`, `hosts check`, and `updates plan` accept repeated `--tag` and `--group` filters.
+- Tag filters match if a host contains any selected tag.
+- Group filters match if a host contains any selected group.
+- When both tags and groups are provided, a host must match at least one selected tag and at least one selected group.
+- Commands return a non-zero exit code if no hosts match the requested filters.
+
 ## Connectivity Checks
 
 Phase 1 now includes a read-only connectivity command that probes each host over SSH without performing package or configuration changes.
@@ -146,6 +176,15 @@ Phase 1 now includes a read-only connectivity command that probes each host over
 - Checks run sequentially and report per-host success or failure.
 - The command exits non-zero if any host fails the connectivity probe.
 - SSH probing is isolated behind a transport boundary so orchestration can be tested without real SSH targets.
+
+## Update Plans
+
+Phase 1 now includes a non-executing update planner that builds the intended host workflow before any mutating command runner exists.
+
+- `updates plan` shows the refresh, preview, apply, and reboot-check steps for each selected host.
+- Mutating upgrade steps remain blocked until approval is provided for hosts that require manual approval.
+- `--approve` marks the plan as approved for preview purposes only; it does not execute the upgrade.
+- The planner uses the host-specific or default update policy from the inventory file.
 
 ## Project Structure
 
@@ -163,10 +202,10 @@ Phase 1 now includes a read-only connectivity command that probes each host over
 
 ## Next Milestones
 
-1. Define the Phase 1 domain model for hosts, approvals, execution results, and audit events.
-2. Extend the YAML inventory parsing and strict validation baseline into execution-ready configuration.
-3. Build the dry-run-first update workflow for Ubuntu hosts.
-4. Add safe remote execution boundaries and file-based audit logging.
+1. Turn the update planner into command execution with explicit approval gates and dry-run-first behavior.
+2. Add per-host result capture and sanitized audit logging for planned and executed operations.
+3. Extend host selection and command reporting into richer status output.
+4. Keep the transport boundary testable while introducing real update orchestration.
 
 ## Notes
 

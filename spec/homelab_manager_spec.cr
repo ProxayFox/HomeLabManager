@@ -105,6 +105,69 @@ describe HomeLabManager::Inventory do
 
     error.errors.first.should contain("ssh_user")
   end
+
+  it "filters hosts by tag and group selection" do
+    inventory = HomeLabManager::Inventory.parse <<-YAML
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          tags: [core, updates]
+          groups: [lab]
+        - name: backup
+          address: backup.internal
+          ssh_user: admin
+          tags: [storage]
+          groups: [backup]
+        - name: edge
+          address: edge.internal
+          ssh_user: ubuntu
+          tags: [updates]
+          groups: [lab]
+    YAML
+
+    selected = HomeLabManager::Inventory.select_hosts(
+      inventory,
+      HomeLabManager::HostSelection.new(["updates"], ["lab"]),
+    )
+
+    selected.map(&.name).should eq(["atlas", "edge"])
+  end
+end
+
+describe HomeLabManager::Updates do
+  it "builds a pending update plan when manual approval is required" do
+    inventory = HomeLabManager::Inventory.parse <<-YAML
+      defaults:
+        update:
+          require_manual_approval: true
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+
+    plan = HomeLabManager::Updates.build_plans(inventory, inventory.hosts, false).first
+
+    plan.approval_state.should eq(HomeLabManager::ApprovalState::Pending)
+    plan.steps.find!(&.mutating?).enabled?.should be_false
+  end
+
+  it "builds an approved update plan when approval is given" do
+    inventory = HomeLabManager::Inventory.parse <<-YAML
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          update:
+            require_manual_approval: true
+    YAML
+
+    plan = HomeLabManager::Updates.build_plans(inventory, inventory.hosts, true).first
+
+    plan.approval_state.should eq(HomeLabManager::ApprovalState::Approved)
+    plan.steps.find!(&.mutating?).enabled?.should be_true
+  end
 end
 
 describe HomeLabManager::CLI do
@@ -146,6 +209,30 @@ describe HomeLabManager::CLI do
       exit_code.should eq(0)
       stdout.to_s.should contain("- atlas")
       stdout.to_s.should contain("update.allow_reboot: false")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "filters listed hosts by tag" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          tags: [core]
+        - name: backup
+          address: backup.internal
+          ssh_user: admin
+          tags: [storage]
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["inventory", "list", path, "--tag", "core"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("- atlas")
+      stdout.to_s.should_not contain("- backup")
       stderr.to_s.should eq("")
     end
   end
@@ -265,6 +352,81 @@ describe HomeLabManager::CLI do
       exit_code.should eq(0)
       stdout.to_s.should contain("Connectivity check: 1 host(s)")
       stdout.to_s.should contain("Summary: 1 succeeded, 0 failed")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "filters host checks by group" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          groups: [lab]
+        - name: backup
+          address: backup.internal
+          ssh_user: admin
+          groups: [backup]
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      transport = FakeTransport.new(
+        {
+          "atlas" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "connectivity_check",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "ssh connectivity ok",
+          ),
+        },
+      )
+
+      exit_code = HomeLabManager::CLI.run(["hosts", "check", path, "--group", "lab"], stdout, stderr, transport)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("- atlas: succeeded")
+      stdout.to_s.should_not contain("backup")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "prints an approval-gated update plan" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          tags: [updates]
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["updates", "plan", path, "--tag", "updates"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("approval_state: pending")
+      stdout.to_s.should contain("step: apply upgrades [blocked]")
+      stdout.to_s.should contain("manual approval required")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "marks the update plan approved when --approve is provided" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["updates", "plan", path, "--approve"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("approval_state: approved")
+      stdout.to_s.should contain("step: apply upgrades [ready]")
       stderr.to_s.should eq("")
     end
   end

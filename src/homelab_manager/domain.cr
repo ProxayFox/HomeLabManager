@@ -1,4 +1,16 @@
 module HomeLabManager
+  struct HostSelection
+    getter tags : Array(String)
+    getter groups : Array(String)
+
+    def initialize(@tags : Array(String) = [] of String, @groups : Array(String) = [] of String)
+    end
+
+    def empty? : Bool
+      tags.empty? && groups.empty?
+    end
+  end
+
   enum ApprovalState
     Pending
     Approved

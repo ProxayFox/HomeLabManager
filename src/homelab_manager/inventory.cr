@@ -133,5 +133,15 @@ module HomeLabManager
     rescue ex
       raise InventoryError.new(["#{source}: #{ex.message}"])
     end
+
+    def select_hosts(inventory : InventoryFile, selection : HostSelection) : Array(Host)
+      return inventory.hosts if selection.empty?
+
+      inventory.hosts.select do |host|
+        matches_tags = selection.tags.empty? || selection.tags.any? { |tag| host.tags.includes?(tag) }
+        matches_groups = selection.groups.empty? || selection.groups.any? { |group| host.groups.includes?(group) }
+        matches_tags && matches_groups
+      end
+    end
   end
 end
