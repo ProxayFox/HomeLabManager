@@ -89,6 +89,8 @@ The build can be verified separately with:
 shards build
 ```
 
+If you are validating the end-to-end Phase 1 host-update workflow, pair these commands with [Phase 1 Verification Checklist](phase-1-verification-checklist.md).
+
 ## When Adding Tests
 
 1. Add coverage to the nearest focused spec file instead of growing a catch-all test file.

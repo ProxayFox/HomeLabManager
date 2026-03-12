@@ -6,10 +6,11 @@ This document describes how a command moves through the codebase today.
 
 1. The executable starts in [src/homelab_manager.cr](/workspaces/HomeLabManager/src/homelab_manager.cr).
 2. `HomeLabManager::CLI.run` in [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr) parses the top-level command and options.
-3. The CLI loads and validates inventory where needed.
-4. Selected hosts are filtered by tags and groups.
-5. The command-specific module runs through the injected transport, audit logger, and update state store.
-6. The CLI renders human-readable or JSON output and returns a process exit code.
+3. Shared option parsing and command-family renderers under [src/homelab_manager/cli/](/workspaces/HomeLabManager/src/homelab_manager/cli) handle common parsing and output responsibilities.
+4. The CLI loads and validates inventory where needed.
+5. Selected hosts are filtered by tags and groups.
+6. The command-specific module runs through the injected transport, audit logger, and update state store.
+7. The CLI renders human-readable or JSON output and returns a process exit code.
 
 ## Inventory Commands
 
@@ -54,6 +55,8 @@ The update commands share the same basic setup and then diverge by how they trea
 4. Resume points are derived either from the explicit `--resume-from` value or from persisted recovery state.
 5. `Updates.build_plans` constructs one `UpdatePlan` per selected host.
 
+Plan construction and resume alias parsing now live in [src/homelab_manager/updates/planner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/planner.cr).
+
 ### `updates plan`
 
 This command stops after plan construction.
@@ -70,6 +73,8 @@ This command executes the plan but keeps the safety model intact.
 - `apply upgrades` is always marked skipped in dry-run mode.
 - Every step result is written through the configured audit logger.
 - A host stops executing later steps after the first failure.
+
+Dry-run and mutating execution behavior now live in [src/homelab_manager/updates/runner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/runner.cr).
 
 ### `updates run`
 

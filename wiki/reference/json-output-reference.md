@@ -203,8 +203,11 @@ The current code emits these categories:
 
 The payload builders are split across these files:
 
-- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr): inventory and connectivity success payloads.
+- [src/homelab_manager/cli/inventory_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/inventory_output.cr): inventory success payloads.
+- [src/homelab_manager/cli/hosts_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/hosts_output.cr): connectivity success payloads.
 - [src/homelab_manager/cli/update_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/update_output.cr): update plan and run success payloads, including `resume_context`.
 - [src/homelab_manager/cli/error_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/error_output.cr): JSON error payloads.
+
+Shared option parsing for `--json`, `--approve`, `--execute`, and `--resume-from` lives in [src/homelab_manager/cli/options.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/options.cr).
 
 If a payload shape changes, update this page and the matching CLI specs in the same change.

@@ -69,7 +69,7 @@ If a plan becomes broadly useful and repeatable, it probably belongs in the wiki
 
 ## Relationship to the Wiki
 
-The wiki under [wiki/README.md](../README.md) is the source of truth for repository documentation.
+The wiki index at [wiki/README.md](../README.md) is the source of truth for repository documentation.
 
 The `.github/` customizations should:
 

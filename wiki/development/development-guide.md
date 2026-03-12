@@ -22,6 +22,8 @@ crystal spec
 
 `crystal spec` is the main verification command. In this repository it also covers static analysis through [spec/ameba_spec.cr](/workspaces/HomeLabManager/spec/ameba_spec.cr).
 
+For the current update workflow, use [Phase 1 Verification Checklist](phase-1-verification-checklist.md) when you need a fuller readiness pass than the standard local loop.
+
 ## Source Layout
 
 - [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr): command dispatch and update-flow orchestration.
@@ -65,3 +67,4 @@ crystal spec
 3. Add or update the focused spec nearest to that concern.
 4. Keep runtime side effects explicit: inventory files, audit logs, and persisted update state should remain easy to locate.
 5. Update the relevant page in this `wiki/` directory when the change affects architecture or command behavior.
+6. If the work spans multiple milestones, start with the project-planning prompt and keep the implementation split into explicit phases, tasks, and staggered commit checkpoints.

@@ -18,16 +18,23 @@ Start by identifying which module owns the behavior instead of adding logic to w
 
 ## Current Ownership Boundaries
 
-- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr): command dispatch, shared option parsing, human-readable output, and top-level execution guards.
+- [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr): command dispatch and top-level execution flow.
+- [src/homelab_manager/cli/options.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/options.cr): shared command option parsing.
+- [src/homelab_manager/cli/inventory_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/inventory_output.cr): inventory text and JSON rendering.
+- [src/homelab_manager/cli/hosts_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/hosts_output.cr): connectivity text and JSON rendering.
 - [src/homelab_manager/cli/error_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/error_output.cr): shared CLI error rendering.
 - [src/homelab_manager/cli/update_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/update_output.cr): JSON rendering for update plan and run payloads.
 - [src/homelab_manager/inventory.cr](/workspaces/HomeLabManager/src/homelab_manager/inventory.cr): YAML parsing, validation, and host selection.
 - [src/homelab_manager/transport.cr](/workspaces/HomeLabManager/src/homelab_manager/transport.cr): remote execution boundary.
-- [src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr): update planning and execution semantics.
+- [src/homelab_manager/updates.cr](/workspaces/HomeLabManager/src/homelab_manager/updates.cr): shared update workflow types.
+- [src/homelab_manager/updates/planner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/planner.cr): update plan construction and resume alias handling.
+- [src/homelab_manager/updates/runner.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/runner.cr): dry-run and execution semantics.
 - [src/homelab_manager/updates/state.cr](/workspaces/HomeLabManager/src/homelab_manager/updates/state.cr): persisted recovery state.
 - [src/homelab_manager/audit.cr](/workspaces/HomeLabManager/src/homelab_manager/audit.cr): audit persistence and sanitization.
 
 If your change crosses more than one of those boundaries, keep each responsibility in its owning module rather than collapsing everything into the CLI.
+
+If the work is large enough to span multiple phases, prepare a plan first and keep the implementation split into explicit phase and task boundaries so the resulting commits can stay staggered and reviewable.
 
 ## Adding a New CLI Feature
 
@@ -56,6 +63,8 @@ Update workflow changes need extra discipline because this part of the project c
 The repository now has an explicit split between text output and some JSON output concerns.
 
 - General command flow and most text output still live in [src/homelab_manager/cli.cr](/workspaces/HomeLabManager/src/homelab_manager/cli.cr).
+- Shared command option parsing lives in [src/homelab_manager/cli/options.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/options.cr).
+- Inventory and connectivity rendering live in [src/homelab_manager/cli/inventory_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/inventory_output.cr) and [src/homelab_manager/cli/hosts_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/hosts_output.cr).
 - Error JSON output lives in [src/homelab_manager/cli/error_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/error_output.cr).
 - Update JSON payloads live in [src/homelab_manager/cli/update_output.cr](/workspaces/HomeLabManager/src/homelab_manager/cli/update_output.cr).
 
