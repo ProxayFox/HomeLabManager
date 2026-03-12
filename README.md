@@ -87,6 +87,7 @@ List the hosts defined in an inventory file:
 
 ```sh
 shards run homelab_manager -- inventory list
+shards run homelab_manager -- inventory list --json
 ```
 
 Limit inventory output to a specific tag or group:
@@ -100,6 +101,7 @@ Run a non-mutating SSH connectivity check across the inventory:
 
 ```sh
 shards run homelab_manager -- hosts check
+shards run homelab_manager -- hosts check --json
 ```
 
 Limit connectivity checks to a selected subset of hosts:
@@ -136,6 +138,9 @@ shards run homelab_manager -- updates run --group lab --approve --resume-from up
 Render update plans and runs as JSON:
 
 ```sh
+shards run homelab_manager -- inventory validate --json
+shards run homelab_manager -- inventory list --json
+shards run homelab_manager -- hosts check --json
 shards run homelab_manager -- updates plan --json
 shards run homelab_manager -- updates dry-run --json
 shards run homelab_manager -- updates run --approve --execute --json
@@ -249,8 +254,11 @@ Audit logging is file-based for the MVP.
 
 ## JSON Output
 
-Update commands now support machine-readable JSON output.
+Inventory, connectivity, and update commands now support machine-readable JSON output.
 
+- `inventory validate --json` emits the inventory path, validity flag, and host count.
+- `inventory list --json` emits the selected hosts, filters, and effective update policy.
+- `hosts check --json` emits per-host connectivity results plus a success/failure summary.
 - `updates plan --json` emits the selected hosts, approval state, and planned steps.
 - `updates dry-run --json` and `updates run --json` emit per-host summaries, reboot-required state, and per-step results.
 - Human-readable output remains the default when `--json` is not provided.
@@ -272,7 +280,7 @@ Update commands now support machine-readable JSON output.
 ## Next Milestones
 
 1. Expand retry and resume behavior beyond step-based restarts into safer host-level recovery workflows.
-2. Extend machine-readable output and summaries to more command areas as the CLI surface grows.
+2. Decide whether JSON error paths should also become structured for stronger automation semantics.
 3. Expand audit logging and sanitization rules as more commands and outputs are introduced.
 4. Keep the transport boundary testable while evolving toward broader host-management operations.
 

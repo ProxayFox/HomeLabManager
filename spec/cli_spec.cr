@@ -19,6 +19,25 @@ describe HomeLabManager::CLI do
     end
   end
 
+  it "renders inventory validation as json" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["inventory", "validate", path, "--json"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("\"type\":\"inventory-validation\"")
+      stdout.to_s.should contain("\"host_count\":1")
+      stderr.to_s.should eq("")
+    end
+  end
+
   it "lists inventory hosts from the CLI" do
     with_temp_inventory <<-YAML do |path|
       defaults:
@@ -39,6 +58,28 @@ describe HomeLabManager::CLI do
       exit_code.should eq(0)
       stdout.to_s.should contain("- atlas")
       stdout.to_s.should contain("update.allow_reboot: false")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "renders inventory hosts as json" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+          tags: [core]
+          groups: [lab]
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["inventory", "list", path, "--tag", "core", "--json"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("\"type\":\"inventory-list\"")
+      stdout.to_s.should contain("\"name\":\"atlas\"")
+      stdout.to_s.should contain("\"tags\":[\"core\"]")
       stderr.to_s.should eq("")
     end
   end
@@ -146,6 +187,37 @@ describe HomeLabManager::CLI do
       stdout.to_s.should contain("- atlas: succeeded")
       stdout.to_s.should contain("- backup: failed")
       stdout.to_s.should contain("Summary: 1 succeeded, 1 failed")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "renders connectivity checks as json" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      transport = FakeTransport.new(
+        {
+          "atlas" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "connectivity_check",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "ssh connectivity ok",
+          ),
+        },
+      )
+
+      exit_code = HomeLabManager::CLI.run(["hosts", "check", path, "--json"], stdout, stderr, transport)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("\"type\":\"connectivity-check\"")
+      stdout.to_s.should contain("\"host\":\"atlas\"")
+      stdout.to_s.should contain("\"succeeded\":1")
       stderr.to_s.should eq("")
     end
   end

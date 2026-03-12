@@ -37,23 +37,23 @@ module HomeLabManager
       io.puts
       io.puts "Usage:"
       io.puts "  homelab_manager inventory validate [inventory.yml]"
-      io.puts "  homelab_manager inventory list [inventory.yml] [--tag TAG] [--group GROUP]"
-      io.puts "  homelab_manager hosts check [inventory.yml] [--tag TAG] [--group GROUP]"
-      io.puts "  homelab_manager updates plan [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
+      io.puts "  homelab_manager inventory list [inventory.yml] [--tag TAG] [--group GROUP] [--json]"
+      io.puts "  homelab_manager hosts check [inventory.yml] [--tag TAG] [--group GROUP] [--json]"
+      io.puts "  homelab_manager updates plan [inventory.yml] [--tag TAG] [--group GROUP] [--approve] [--json]"
       io.puts "  homelab_manager updates dry-run [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
       io.puts "  homelab_manager updates run [inventory.yml] [--tag TAG] [--group GROUP] [--approve] [--resume-from ACTION] --execute"
       io.puts
       io.puts "Commands:"
       io.puts "  inventory validate   Validate the inventory file before any remote action"
-      io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH}"
+      io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH} and supports optional --json"
       io.puts "  inventory list       List the hosts defined in the inventory file"
       io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH}"
-      io.puts "                       Supports repeated --tag and --group filters"
+      io.puts "                       Supports repeated --tag and --group filters plus optional --json"
       io.puts "  hosts check          Probe SSH connectivity for each host"
       io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH}"
-      io.puts "                       Supports repeated --tag and --group filters"
+      io.puts "                       Supports repeated --tag and --group filters plus optional --json"
       io.puts "  updates plan         Build a dry-run-first update plan without executing it"
-      io.puts "                       Supports repeated --tag and --group filters and optional --approve"
+      io.puts "                       Supports repeated --tag and --group filters, optional --approve, and optional --json"
       io.puts "  updates dry-run      Execute only non-mutating update steps and write audit logs"
       io.puts "                       Supports repeated --tag and --group filters, optional --approve, and optional --json"
       io.puts "  updates run          Execute the full update workflow, including approved mutating steps"
@@ -70,18 +70,26 @@ module HomeLabManager
         return 1
       end
 
-      options = parse_command_options(args[1..])
+      options = parse_command_options(args[1..], allow_json: true)
       inventory = Inventory.load(options.path)
 
       case subcommand
       when "validate"
-        stdout.puts "Inventory valid: #{inventory.hosts.size} host(s) loaded from #{options.path}"
+        if options.json
+          print_inventory_validation_json(options.path, inventory, stdout)
+        else
+          stdout.puts "Inventory valid: #{inventory.hosts.size} host(s) loaded from #{options.path}"
+        end
         0
       when "list"
         hosts = Inventory.select_hosts(inventory, options.selection)
         return print_empty_selection(stderr, options.selection) if hosts.empty?
 
-        print_inventory_list(inventory, hosts, stdout)
+        if options.json
+          print_inventory_list_json(options.path, inventory, hosts, options.selection, stdout)
+        else
+          print_inventory_list(inventory, hosts, stdout)
+        end
         0
       else
         stderr.puts "Unknown inventory subcommand: #{subcommand}"
@@ -102,7 +110,7 @@ module HomeLabManager
         return 1
       end
 
-      options = parse_command_options(args[1..])
+      options = parse_command_options(args[1..], allow_json: true)
 
       case subcommand
       when "check"
@@ -111,7 +119,11 @@ module HomeLabManager
         return print_empty_selection(stderr, options.selection) if hosts.empty?
 
         results = Connectivity.check(InventoryFile.new(inventory.defaults, hosts), transport, DEFAULT_CONNECT_TIMEOUT_SECONDS)
-        print_host_check_results(results, stdout)
+        if options.json
+          print_host_check_results_json(options.path, results, options.selection, stdout)
+        else
+          print_host_check_results(results, stdout)
+        end
         Connectivity.succeeded?(results) ? 0 : 1
       else
         stderr.puts "Unknown hosts subcommand: #{subcommand}"
@@ -241,6 +253,91 @@ module HomeLabManager
       end
     end
 
+    private def print_inventory_validation_json(path : String, inventory : InventoryFile, io : IO) : Nil
+      JSON.build(io) do |json|
+        json.object do
+          json.field "type", "inventory-validation"
+          json.field "path", path
+          json.field "valid", true
+          json.field "host_count", inventory.hosts.size
+        end
+      end
+      io.puts
+    end
+
+    private def print_inventory_list_json(path : String, inventory : InventoryFile, hosts : Array(Host), selection : HostSelection, io : IO) : Nil
+      JSON.build(io) do |json|
+        json.object do
+          json.field "type", "inventory-list"
+          json.field "path", path
+          json.field "selection" do
+            json.object do
+              json.field "tags" do
+                json.array do
+                  selection.tags.each do |tag|
+                    json.string(tag)
+                  end
+                end
+              end
+              json.field "groups" do
+                json.array do
+                  selection.groups.each do |group|
+                    json.string(group)
+                  end
+                end
+              end
+            end
+          end
+          json.field "defaults" do
+            json.object do
+              json.field "update" do
+                print_update_policy_json(json, inventory.defaults.update)
+              end
+            end
+          end
+          json.field "hosts" do
+            json.array do
+              hosts.each do |host|
+                json.object do
+                  json.field "name", host.name
+                  json.field "address", host.address
+                  json.field "port", host.port
+                  json.field "ssh_user", host.ssh_user
+                  json.field "tags" do
+                    json.array do
+                      host.tags.each do |tag|
+                        json.string(tag)
+                      end
+                    end
+                  end
+                  json.field "groups" do
+                    json.array do
+                      host.groups.each do |group|
+                        json.string(group)
+                      end
+                    end
+                  end
+                  json.field "update" do
+                    print_update_policy_json(json, host.effective_update(inventory.defaults))
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+      io.puts
+    end
+
+    private def print_update_policy_json(json : JSON::Builder, policy : UpdatePolicy) : Nil
+      json.object do
+        json.field "refresh_package_index", policy.refresh_package_index?
+        json.field "preview_upgrades", policy.preview_upgrades?
+        json.field "require_manual_approval", policy.require_manual_approval?
+        json.field "allow_reboot", policy.allow_reboot?
+      end
+    end
+
     private def print_host_check_results(results : Array(ExecutionResult), io : IO) : Nil
       io.puts "Connectivity check: #{results.size} host(s)"
 
@@ -255,6 +352,52 @@ module HomeLabManager
       succeeded_count = results.count { |result| result.status == OperationStatus::Succeeded }
       failed_count = results.count { |result| result.status == OperationStatus::Failed }
       io.puts "Summary: #{succeeded_count} succeeded, #{failed_count} failed"
+    end
+
+    private def print_host_check_results_json(path : String, results : Array(ExecutionResult), selection : HostSelection, io : IO) : Nil
+      JSON.build(io) do |json|
+        json.object do
+          json.field "type", "connectivity-check"
+          json.field "path", path
+          json.field "selection" do
+            json.object do
+              json.field "tags" do
+                json.array do
+                  selection.tags.each do |tag|
+                    json.string(tag)
+                  end
+                end
+              end
+              json.field "groups" do
+                json.array do
+                  selection.groups.each do |group|
+                    json.string(group)
+                  end
+                end
+              end
+            end
+          end
+          json.field "summary" do
+            json.object do
+              json.field "succeeded", results.count { |result| result.status == OperationStatus::Succeeded }
+              json.field "failed", results.count { |result| result.status == OperationStatus::Failed }
+            end
+          end
+          json.field "hosts" do
+            json.array do
+              results.each do |result|
+                json.object do
+                  json.field "host", result.host_name
+                  json.field "status", result.status.to_s.downcase
+                  json.field "exit_code", result.exit_code
+                  json.field "summary", result.summary
+                end
+              end
+            end
+          end
+        end
+      end
+      io.puts
     end
 
     private def print_update_plans(plans : Array(UpdatePlan), io : IO) : Nil
