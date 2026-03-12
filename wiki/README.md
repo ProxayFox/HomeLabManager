@@ -19,6 +19,11 @@ The main [README](../README.md) stays focused on project goals, operator usage, 
 - [Transport and SSH](runtime/transport-and-ssh.md): transport abstraction, SSH command behavior, and timeout semantics.
 - [Audit Logging](runtime/audit-logging.md): audit logger types, log shape, and sanitization rules.
 
+### Security
+
+- [Security Overview](security/README.md): where the project security model, requirements, and review expectations live.
+- [Project Security Requirements](security/project-security-requirements.md): mandatory safeguards, trust boundaries, best practices, and required verification for security-sensitive changes.
+
 ### Operations
 
 - [Inventory Runbook](operations/inventory-runbook.md): how to create, validate, and inspect operator inventory safely.
