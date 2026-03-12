@@ -5,3 +5,4 @@
 /bin/
 /.shards/
 *.dwarf
+config/inventory.yml

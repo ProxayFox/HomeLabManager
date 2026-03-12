@@ -74,12 +74,68 @@ Run the test suite:
 crystal spec
 ```
 
+Validate an inventory file before any remote work begins:
+
+```sh
+cp config/inventory.example.yml config/inventory.yml
+shards run homelab_manager -- inventory validate config/inventory.yml
+```
+
+List the hosts defined in an inventory file:
+
+```sh
+shards run homelab_manager -- inventory list config/inventory.yml
+```
+
+## Inventory Format
+
+Phase 1 currently provides a validated YAML inventory baseline for host definitions.
+
+Recommended location:
+
+- Keep the operator-managed inventory at `config/inventory.yml`.
+- Start from the tracked template at `config/inventory.example.yml`.
+- `config/inventory.yml` is ignored by Git so real host details are not committed to the remote.
+
+Example:
+
+```yaml
+defaults:
+  update:
+    refresh_package_index: true
+    preview_upgrades: true
+    require_manual_approval: true
+    allow_reboot: false
+hosts:
+  - name: atlas
+    address: 192.168.1.10
+    ssh_user: ubuntu
+    tags: [core]
+    groups: [lab]
+  - name: backup
+    address: backup.internal
+    ssh_user: admin
+    port: 2222
+    update:
+      allow_reboot: true
+```
+
+Current validation rules:
+
+- `hosts` must contain at least one host.
+- Each host must define non-blank `name`, `address`, and `ssh_user` fields.
+- `port` defaults to `22` and must remain within the valid TCP port range.
+- Host names must be unique within the inventory file.
+- Inventory validation must succeed before later SSH-based features are allowed to run.
+- Copy `config/inventory.example.yml` to `config/inventory.yml` before adding real host data.
+
 ## Project Structure
 
 ```text
 .
 ├── .devcontainer/        # Devcontainer configuration
 ├── .github/              # Workspace-specific Copilot instructions and prompts
+├── config/               # Example inventory and local operator config location
 ├── spec/                 # Test files
 ├── src/                  # Application source
 ├── bin/                  # Build output from shards build
@@ -90,7 +146,7 @@ crystal spec
 ## Next Milestones
 
 1. Define the Phase 1 domain model for hosts, approvals, execution results, and audit events.
-2. Introduce YAML inventory parsing and strict validation.
+2. Extend the YAML inventory parsing and strict validation baseline into execution-ready configuration.
 3. Build the dry-run-first update workflow for Ubuntu hosts.
 4. Add safe remote execution boundaries and file-based audit logging.
 
