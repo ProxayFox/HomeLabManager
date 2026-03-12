@@ -455,6 +455,58 @@ describe HomeLabManager::CLI do
     end
   end
 
+  it "uses persisted recovery state when no resume-from is provided" do
+    with_temp_working_directory do |path|
+      inventory_path = File.join(path, "inventory.yml")
+      File.write(
+        inventory_path,
+        <<-YAML
+          hosts:
+            - name: atlas
+              address: 192.168.1.10
+              ssh_user: ubuntu
+        YAML
+      )
+
+      state_store = HomeLabManager::Updates::StateStore.new(File.join(path, HomeLabManager::CLI::DEFAULT_UPDATE_STATE_PATH))
+      state_store.record_runs([
+        HomeLabManager::UpdateRun.new(
+          HomeLabManager::Inventory.load(inventory_path).hosts.first,
+          HomeLabManager::ApprovalState::Approved,
+          [
+            HomeLabManager::ExecutionResult.new(
+              "atlas",
+              "update_refresh_package_index",
+              HomeLabManager::OperationStatus::Succeeded,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 0,
+              summary: "package lists refreshed",
+            ),
+            HomeLabManager::ExecutionResult.new(
+              "atlas",
+              "update_apply_upgrades",
+              HomeLabManager::OperationStatus::Failed,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 100,
+              summary: "apt failed",
+            ),
+          ],
+          false,
+        ),
+      ])
+
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["updates", "plan", inventory_path, "--approve"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("skipped before resume point")
+      stdout.to_s.should contain("step: apply upgrades [ready]")
+      stderr.to_s.should eq("")
+    end
+  end
+
   it "executes approved updates and reports partial failures" do
     with_temp_inventory <<-YAML do |path|
       hosts:

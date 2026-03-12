@@ -74,9 +74,15 @@ module HomeLabManager
   module Updates
     extend self
 
-    def build_plans(inventory : InventoryFile, hosts : Array(Host), approved : Bool, resume_from : UpdateStepKind? = nil) : Array(UpdatePlan)
+    def build_plans(
+      inventory : InventoryFile,
+      hosts : Array(Host),
+      approved : Bool,
+      resume_from : UpdateStepKind? = nil,
+      resume_points : Hash(String, UpdateStepKind)? = nil,
+    ) : Array(UpdatePlan)
       hosts.map do |host|
-        build_plan(host, inventory.defaults, approved, resume_from)
+        build_plan(host, inventory.defaults, approved, resume_from || resume_points.try(&.[host.name]?))
       end
     end
 

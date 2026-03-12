@@ -8,6 +8,7 @@ require "./transport"
 require "./connectivity"
 require "./audit"
 require "./updates"
+require "./updates/state"
 require "./cli"
 
 # HomeLabManager is a safety-first CLI for homelab host management.

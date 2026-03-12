@@ -4,6 +4,7 @@ module HomeLabManager
 
     DEFAULT_INVENTORY_PATH          = "config/inventory.yml"
     DEFAULT_CONNECT_TIMEOUT_SECONDS = Transport::DEFAULT_CONNECT_TIMEOUT_SECONDS
+    DEFAULT_UPDATE_STATE_PATH       = Updates::DEFAULT_STATE_PATH
 
     private record CommandOptions,
       path : String,
@@ -13,7 +14,14 @@ module HomeLabManager
       resume_from : String?,
       json : Bool
 
-    def run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR, transport : Transport = SshTransport.new, audit_logger : Audit::Logger = Audit::FileLogger.new) : Int32
+    def run(
+      args : Array(String),
+      stdout : IO = STDOUT,
+      stderr : IO = STDERR,
+      transport : Transport = SshTransport.new,
+      audit_logger : Audit::Logger = Audit::FileLogger.new,
+      state_store : Updates::StateStore = Updates::StateStore.new,
+    ) : Int32
       return print_help(stdout) if args.empty?
 
       case args[0]
@@ -24,7 +32,7 @@ module HomeLabManager
       when "hosts"
         run_hosts(args[1..], stdout, stderr, transport)
       when "updates"
-        run_updates(args[1..], stdout, stderr, transport, audit_logger)
+        run_updates(args[1..], stdout, stderr, transport, audit_logger, state_store)
       else
         stderr.puts "Unknown command: #{args[0]}"
         stderr.puts
@@ -58,6 +66,7 @@ module HomeLabManager
       io.puts "                       Supports repeated --tag and --group filters, optional --approve, and optional --json"
       io.puts "  updates run          Execute the full update workflow, including approved mutating steps"
       io.puts "                       Requires --execute and supports repeated --tag/--group filters, optional --approve, --resume-from ACTION, and --json"
+      io.puts "                       Uses persisted recovery state from #{DEFAULT_UPDATE_STATE_PATH} when --resume-from is not provided"
       exit_code
     end
 
@@ -135,7 +144,7 @@ module HomeLabManager
       1
     end
 
-    private def run_updates(args : Array(String), stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger) : Int32
+    private def run_updates(args : Array(String), stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger, state_store : Updates::StateStore) : Int32
       subcommand = args[0]?
 
       unless subcommand
@@ -145,7 +154,7 @@ module HomeLabManager
       end
 
       options = parse_command_options(args[1..], allow_approve: true, allow_execute: true, allow_resume_from: true, allow_json: true)
-      handle_updates_subcommand(subcommand, options, stdout, stderr, transport, audit_logger)
+      handle_updates_subcommand(subcommand, options, stdout, stderr, transport, audit_logger, state_store)
     rescue ex : InventoryError
       print_inventory_errors(stderr, ex)
       1
@@ -158,14 +167,15 @@ module HomeLabManager
       stderr : IO,
       transport : Transport,
       audit_logger : Audit::Logger,
+      state_store : Updates::StateStore,
     ) : Int32
       case subcommand
       when "plan"
-        run_updates_plan(options, stdout, stderr)
+        run_updates_plan(options, stdout, stderr, state_store)
       when "dry-run"
-        run_updates_dry_run(options, stdout, stderr, transport, audit_logger)
+        run_updates_dry_run(options, stdout, stderr, transport, audit_logger, state_store)
       when "run"
-        run_updates_execute(options, stdout, stderr, transport, audit_logger)
+        run_updates_execute(options, stdout, stderr, transport, audit_logger, state_store)
       else
         stderr.puts "Unknown updates subcommand: #{subcommand}"
         stderr.puts "Expected: plan, dry-run, run"
@@ -181,12 +191,12 @@ module HomeLabManager
       {inventory, hosts}
     end
 
-    private def run_updates_plan(options : CommandOptions, stdout : IO, stderr : IO) : Int32
+    private def run_updates_plan(options : CommandOptions, stdout : IO, stderr : IO, state_store : Updates::StateStore) : Int32
       loaded = load_selected_hosts(options, stderr)
       return 1 unless loaded
 
       inventory, hosts = loaded
-      plans = Updates.build_plans(inventory, hosts, options.approve, parse_resume_from_option(options))
+      plans = resolve_update_plans(options, inventory, hosts, state_store)
       if options.json
         print_update_plans_json(plans, stdout)
       else
@@ -195,12 +205,12 @@ module HomeLabManager
       0
     end
 
-    private def run_updates_dry_run(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger) : Int32
+    private def run_updates_dry_run(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger, state_store : Updates::StateStore) : Int32
       loaded = load_selected_hosts(options, stderr)
       return 1 unless loaded
 
       inventory, hosts = loaded
-      plans = Updates.build_plans(inventory, hosts, options.approve, parse_resume_from_option(options))
+      plans = resolve_update_plans(options, inventory, hosts, state_store)
       runs = Updates.dry_run(plans, transport, audit_logger)
       if options.json
         print_update_runs_json("dry-run", runs, stdout)
@@ -211,7 +221,7 @@ module HomeLabManager
       Updates.successful?(runs) ? 0 : 1
     end
 
-    private def run_updates_execute(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger) : Int32
+    private def run_updates_execute(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger, state_store : Updates::StateStore) : Int32
       unless options.execute
         stderr.puts "Refusing to run mutating updates without --execute"
         stderr.puts "Use updates plan or updates dry-run first, then rerun with --execute when ready"
@@ -222,8 +232,9 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
-      plans = Updates.build_plans(inventory, hosts, options.approve, parse_resume_from_option(options))
+      plans = resolve_update_plans(options, inventory, hosts, state_store)
       runs = Updates.execute(plans, transport, audit_logger)
+      state_store.record_runs(runs)
       if options.json
         print_update_runs_json("run", runs, stdout)
       else
@@ -617,6 +628,19 @@ module HomeLabManager
       return nil unless value = options.resume_from
 
       Updates.parse_resume_from(value)
+    end
+
+    private def resolve_update_plans(
+      options : CommandOptions,
+      inventory : InventoryFile,
+      hosts : Array(Host),
+      state_store : Updates::StateStore,
+    ) : Array(UpdatePlan)
+      if resume_from = parse_resume_from_option(options)
+        Updates.build_plans(inventory, hosts, options.approve, resume_from)
+      else
+        Updates.build_plans(inventory, hosts, options.approve, resume_points: state_store.resume_points(hosts))
+      end
     end
 
     private def print_empty_selection(stderr : IO, selection : HostSelection) : Int32

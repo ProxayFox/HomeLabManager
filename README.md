@@ -135,6 +135,8 @@ shards run homelab_manager -- updates run --group lab --approve --execute
 shards run homelab_manager -- updates run --group lab --approve --resume-from update_apply_upgrades --execute
 ```
 
+When a prior `updates run` fails, later `updates plan`, `updates dry-run`, and `updates run` commands automatically reuse persisted recovery state from `state/update-runs.json` unless you override it with `--resume-from`.
+
 Render update plans and runs as JSON:
 
 ```sh
@@ -231,6 +233,7 @@ Phase 1 now includes the first real mutating runner for approved host updates.
 - `updates run` requires `--execute` so mutating actions are never triggered by accident.
 - Hosts that still require approval will keep the upgrade step blocked unless `--approve` is also provided.
 - `--resume-from` lets you skip earlier steps and resume from a specific update action after a partial failure or manual intervention.
+- Failed `updates run` executions persist per-host recovery metadata under `state/update-runs.json`, and later update commands reuse that state automatically when `--resume-from` is not supplied.
 - Per-host execution stops after the first failed step and clearly marks later steps as skipped.
 - Execution output includes per-host overall status, per-step results, and reboot-required reporting when the host check completes.
 - The command exits non-zero when any host run includes a failed step.
@@ -248,6 +251,7 @@ Audit logging is file-based for the MVP.
 
 - Dry-run execution writes JSON line entries to `logs/audit.log`.
 - Dry-run and real update execution both write JSON line entries to `logs/audit.log`.
+- Persisted recovery state for failed update runs is stored separately in `state/update-runs.json`.
 - Runtime logs are ignored by Git.
 - Log entries include timestamp, operator, host, action, approval state, exit status, and sanitized command/result summaries.
 - Sensitive-looking `password=`, `passwd=`, `token=`, and `secret=` values are redacted before being written.

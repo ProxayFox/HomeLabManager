@@ -8,3 +8,4 @@
 *.dwarf
 config/inventory.yml
 logs/
+state/
