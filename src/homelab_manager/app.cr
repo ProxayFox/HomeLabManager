@@ -10,6 +10,7 @@ require "./audit"
 require "./updates"
 require "./updates/state"
 require "./cli/error_output"
+require "./cli/update_output"
 require "./cli"
 
 # HomeLabManager is a safety-first CLI for homelab host management.
