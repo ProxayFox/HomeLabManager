@@ -46,17 +46,21 @@ Set:
 Then run:
 
 ```sh
-crystal spec spec/update_integration_spec.cr
+scripts/run_update_integration_spec.sh /absolute/path/to/integration.inventory.yml
 ```
+
+Start from [config/integration.inventory.example.yml](/workspaces/HomeLabManager/config/integration.inventory.example.yml) when preparing the operator-managed integration inventory file.
 
 The integration harness currently verifies that:
 
 - the real `SshTransport` can load the supplied inventory,
 - update plans can be built for the selected hosts,
-- the non-mutating update path can execute without mutating the host,
-- each targeted host produces step results.
+- the non-mutating update path can execute successfully without mutating the host,
+- each targeted host completes the dry-run without failed steps.
 
 Do not point this at production or other critical hosts.
+
+Use [../operations/live-host-validation-plan.md](../operations/live-host-validation-plan.md) as the setup sequence for choosing and preparing that host.
 
 ## 4. Operator-Facing Artifacts
 

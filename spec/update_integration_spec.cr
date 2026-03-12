@@ -18,6 +18,7 @@ if ENV["HOMELAB_MANAGER_ENABLE_INTEGRATION_SPECS"]? == "1"
 
       runs.size.should eq(plans.size)
       runs.each do |run|
+        run.successful?.should be_true
         run.step_results.should_not be_empty
       end
     end

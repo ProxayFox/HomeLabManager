@@ -59,6 +59,8 @@ It is disabled by default and only runs when both of these environment variables
 
 Use it only with a safe staging inventory. It exists to verify that the production `SshTransport` can execute the non-mutating update path against real hosts without making the standard spec suite unsafe or flaky.
 
+The repository also provides [scripts/run_update_integration_spec.sh](/workspaces/HomeLabManager/scripts/run_update_integration_spec.sh) to set those variables and run the harness against an operator-supplied inventory path.
+
 ## What the Specs Protect
 
 The current suite is especially valuable around the project's safety model.

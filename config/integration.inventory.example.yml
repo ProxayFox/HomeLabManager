@@ -1,0 +1,18 @@
+defaults:
+  update:
+    refresh_package_index: true
+    preview_upgrades: true
+    require_manual_approval: true
+    allow_reboot: false
+hosts:
+  - name: staging-atlas
+    address: staging-host.example.invalid
+    ssh_user: ubuntu
+    port: 22
+    tags:
+      - integration
+      - updates
+    groups:
+      - staging
+    update:
+      require_manual_approval: true

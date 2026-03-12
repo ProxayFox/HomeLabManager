@@ -217,6 +217,31 @@ Use [JSON Output Reference](../reference/json-output-reference.md), which docume
 - `resume_context`,
 - update step result fields.
 
+## Integration Harness Problems
+
+### Symptom
+
+The live-host integration spec fails immediately or cannot start.
+
+### Likely Causes
+
+- `HOMELAB_MANAGER_INTEGRATION_INVENTORY` is unset,
+- the supplied integration inventory path is wrong,
+- the inventory still contains placeholder values from [config/integration.inventory.example.yml](/workspaces/HomeLabManager/config/integration.inventory.example.yml),
+- the selected host is unreachable or not safe for the intended validation step.
+
+### What to Do
+
+1. Start from the tracked template and create an operator-managed integration inventory file outside Git.
+2. Validate that file explicitly.
+3. Run the wrapper:
+
+```sh
+scripts/run_update_integration_spec.sh /absolute/path/to/integration.inventory.yml
+```
+
+4. If the host is unreachable, fall back to [live-host-validation-plan.md](live-host-validation-plan.md) and recheck connectivity before retrying the harness.
+
 ## Build or Test Failures
 
 ### Symptom

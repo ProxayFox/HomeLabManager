@@ -24,7 +24,7 @@ The main [README](../README.md) stays focused on project goals, operator usage, 
 - [Inventory Runbook](operations/inventory-runbook.md): how to create, validate, and inspect operator inventory safely.
 - [Connectivity Runbook](operations/connectivity-runbook.md): how to confirm SSH reachability before update work.
 - [Update Runbook](operations/update-runbook.md): how to move from plan to dry-run to execution and recovery.
-- [Quick Start Workflow](operations/quick-start-workflow.md): the shortest safe checklist from inventory setup to update execution.
+- [Live Host Validation Plan](operations/live-host-validation-plan.md): how to prepare and validate a real non-critical test host.
 - [Troubleshooting](operations/troubleshooting.md): common failure modes across inventory, connectivity, updates, and verification.
 
 ### Reference
