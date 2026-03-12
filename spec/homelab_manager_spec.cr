@@ -38,8 +38,8 @@ describe HomeLabManager::Inventory do
     YAML
 
     inventory.hosts.size.should eq(2)
-    inventory.hosts[0].effective_update(inventory.defaults).allow_reboot.should be_false
-    inventory.hosts[1].effective_update(inventory.defaults).allow_reboot.should be_true
+    inventory.hosts[0].effective_update(inventory.defaults).allow_reboot?.should be_false
+    inventory.hosts[1].effective_update(inventory.defaults).allow_reboot?.should be_true
   end
 
   it "rejects duplicate host names and blank required fields" do

@@ -10,16 +10,16 @@ module HomeLabManager
   struct UpdatePolicy
     include YAML::Serializable
 
-    getter refresh_package_index : Bool = true
-    getter preview_upgrades : Bool = true
-    getter require_manual_approval : Bool = true
-    getter allow_reboot : Bool = false
+    getter? refresh_package_index : Bool = true
+    getter? preview_upgrades : Bool = true
+    getter? require_manual_approval : Bool = true
+    getter? allow_reboot : Bool = false
 
     def initialize(
       @refresh_package_index : Bool = true,
       @preview_upgrades : Bool = true,
       @require_manual_approval : Bool = true,
-      @allow_reboot : Bool = false
+      @allow_reboot : Bool = false,
     )
     end
   end
@@ -79,7 +79,7 @@ module HomeLabManager
 
     def initialize(
       @defaults : InventoryDefaults = InventoryDefaults.new,
-      @hosts : Array(Host) = [] of Host
+      @hosts : Array(Host) = [] of Host,
     )
     end
 

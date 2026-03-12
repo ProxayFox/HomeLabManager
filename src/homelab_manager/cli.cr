@@ -81,10 +81,10 @@ module HomeLabManager
         io.puts "  ssh_user: #{host.ssh_user}"
         io.puts "  tags: #{tags}"
         io.puts "  groups: #{groups}"
-        io.puts "  update.refresh_package_index: #{update_policy.refresh_package_index}"
-        io.puts "  update.preview_upgrades: #{update_policy.preview_upgrades}"
-        io.puts "  update.require_manual_approval: #{update_policy.require_manual_approval}"
-        io.puts "  update.allow_reboot: #{update_policy.allow_reboot}"
+        io.puts "  update.refresh_package_index: #{update_policy.refresh_package_index?}"
+        io.puts "  update.preview_upgrades: #{update_policy.preview_upgrades?}"
+        io.puts "  update.require_manual_approval: #{update_policy.require_manual_approval?}"
+        io.puts "  update.allow_reboot: #{update_policy.allow_reboot?}"
       end
     end
   end

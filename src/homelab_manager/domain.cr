@@ -26,7 +26,7 @@ module HomeLabManager
       @status : OperationStatus,
       @approval_state : ApprovalState = ApprovalState::Pending,
       @exit_code : Int32? = nil,
-      @summary : String = ""
+      @summary : String = "",
     )
     end
   end
