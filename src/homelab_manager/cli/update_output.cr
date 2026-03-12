@@ -1,5 +1,48 @@
 module HomeLabManager
   module CLI
+    private def print_update_plans(plans : Array(UpdatePlan), io : IO) : Nil
+      io.puts "Update plan: #{plans.size} host(s)"
+
+      plans.each do |plan|
+        io.puts "- #{plan.host.name}"
+        io.puts "  approval_state: #{plan.approval_state.to_s.downcase}"
+        io.puts "  approval_required: #{plan.approval_required?}"
+
+        plan.steps.each do |step|
+          status = step.enabled? ? "ready" : "blocked"
+          io.puts "  step: #{step.label} [#{status}]"
+          io.puts "    command: #{step.command}"
+          if reason = step.reason
+            io.puts "    reason: #{reason}"
+          end
+        end
+      end
+    end
+
+    private def print_update_runs(title : String, runs : Array(UpdateRun), io : IO) : Nil
+      io.puts "#{title}: #{runs.size} host(s)"
+
+      runs.each do |run|
+        io.puts "- #{run.host.name}"
+        io.puts "  overall_status: #{run.overall_status}"
+        io.puts "  approval_state: #{run.approval_state.to_s.downcase}"
+        io.puts "  reboot_required: #{run.reboot_required}" unless run.reboot_required.nil?
+
+        run.step_results.each do |result|
+          io.puts "  action: #{result.action} [#{result.status.to_s.downcase}]"
+          io.puts "    summary: #{result.summary}"
+          if exit_code = result.exit_code
+            io.puts "    exit_code: #{exit_code}"
+          end
+        end
+      end
+
+      succeeded_count = runs.count(&.successful?)
+      partial_count = runs.count(&.partially_failed?)
+      failed_count = runs.size - succeeded_count - partial_count
+      io.puts "Summary: #{succeeded_count} succeeded, #{partial_count} partial, #{failed_count} failed"
+    end
+
     private def print_update_plans_json(plans : Array(UpdatePlan), io : IO, recovery_entries : Hash(String, Updates::RecoveryStateEntry) = {} of String => Updates::RecoveryStateEntry) : Nil
       JSON.build(io) do |json|
         json.object do
