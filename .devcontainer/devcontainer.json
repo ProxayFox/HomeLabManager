@@ -3,6 +3,7 @@
   "build": {
     "dockerfile": "dockerfile",
     "args": {
+      "ameba_version": "1.6.4",
       "crystal_version": "1.19.1",
       "crystal_release": "1"
     }
@@ -21,6 +22,5 @@
       ]
     }
   },
-  "postCreateCommand": "shards install",
   "remoteUser": "vscode"
 }

@@ -5,13 +5,16 @@ RUN \
   apt-get install -y apt-transport-https && \
   apt-get update && \
   DEBIAN_FRONTEND=noninteractive \
-  apt-get install -y tzdata gcc pkg-config libssl-dev libxml2-dev libyaml-dev libgmp-dev git make \
+  apt-get install -y tzdata gcc pkg-config libssl-dev libxml2-dev libyaml-dev libgmp-dev musl-dev git make \
+  yq jq \
   libpcre2-dev libz-dev libgc-dev && \
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ARG TARGETARCH
+ARG ameba_version=1.6.4
 ARG crystal_version=1.19.1
 ARG crystal_release=1
+ARG CRFLAGS="-Dpreview_mt"
 
 RUN \
   CRYSTAL_ARCH=$(case "${TARGETARCH}" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; *) echo "${TARGETARCH}" ;; esac) && \
@@ -19,3 +22,28 @@ RUN \
   "https://github.com/crystal-lang/crystal/releases/download/${crystal_version}/crystal-${crystal_version}-${crystal_release}-linux-${CRYSTAL_ARCH}.tar.gz" && \
   tar -xz -C /usr --strip-component=1 -f /tmp/crystal.tar.gz && \
   rm /tmp/crystal.tar.gz
+
+RUN crystal -v
+
+WORKDIR /tmp/ameba-build
+
+RUN mkdir -p bin && \
+  printf '%s\n' \
+    "name: ameba_tooling" \
+    "version: 0.1.0" \
+    "targets:" \
+    "  ameba:" \
+    "    main: bin/ameba.cr" \
+    "dependencies:" \
+    "  ameba:" \
+    "    github: crystal-ameba/ameba" \
+    "    version: = ${ameba_version}" \
+    > shard.yml && \
+  printf '%s\n' \
+    'require "ameba/cli"' \
+    > bin/ameba.cr && \
+  shards build ameba && \
+  install -Dm755 bin/ameba /usr/local/bin/ameba && \
+  rm -rf /tmp/ameba-build
+
+WORKDIR /workspaces/HomeLabManager
