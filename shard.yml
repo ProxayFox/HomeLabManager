@@ -1,12 +1,12 @@
-name: playground
+name: homelab_manager
 version: 0.1.0
 
 authors:
-  - your-name-here <your-email-here>
+  - ProxayFox
 
 targets:
-  playground:
-    main: src/playground.cr
+  homelab_manager:
+    main: src/homelab_manager.cr
 
 crystal: '>= 1.19.1'
 

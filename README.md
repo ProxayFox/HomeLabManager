@@ -1,33 +1,32 @@
-# Crystal Lang Template
+# HomeLabManager
 
-This repository is a starter template for building Crystal console applications with a ready-to-use devcontainer, Shards configuration, and a minimal project layout.
+HomeLabManager is a Crystal-based homelab management project focused on safe, repeatable Ubuntu host operations. The first milestone is a CLI that removes the weekly manual SSH routine for package updates while keeping approval gates, auditability, and secrets hygiene in front of convenience.
 
-Use it when you want to start a new Crystal project without rebuilding the container setup, compiler installation, editor extensions, and basic file structure from scratch.
+## Current Scope
 
-## What This Template Includes
+Phase 0 is complete: this repository now reflects the real project identity instead of the generic Crystal starter template.
 
-- Crystal 1.19.1 in a VS Code devcontainer
-- Shards configured with a starter target in [shard.yml](shard.yml)
-- Crystal source layout under [src/](src)
-- Spec setup under [spec/](spec)
-- Build output kept in [bin/](bin) through `shards build`
-- Workspace instructions for AI-assisted editing in [.github/copilot-instructions.md](.github/copilot-instructions.md)
+The current MVP direction is:
 
-## Create a New Repository From This Template
+- CLI first, web UI later
+- Manage 4 to 10 Ubuntu hosts
+- Use a single YAML inventory file initially
+- Authenticate with the operator's SSH keys or SSH agent
+- Require dry runs and manual approval before mutating actions
+- Defer Docker Compose migration from the existing Python tool until after the host-update workflow is stable
 
-1. On GitHub, click `Use this template` on the template repository.
-2. Create your new repository from it.
-3. Clone your new repository locally.
-4. Rename the shard, target, module, and metadata placeholders to match your project.
+## Planned MVP
 
-Example:
+The first real feature set is a host maintenance workflow that can:
 
-```sh
-git clone https://github.com/your-user/your-new-repo.git
-cd your-new-repo
-```
+- Validate inventory before any remote action starts
+- Check connectivity to known hosts
+- Preview available package updates safely
+- Execute approved update actions host by host
+- Detect whether a reboot is required after updates
+- Record sanitized audit logs for each operation
 
-## Set Up The Project
+## Development Environment
 
 You can work in either the devcontainer or a local Crystal installation.
 
@@ -38,7 +37,7 @@ You can work in either the devcontainer or a local Crystal installation.
 3. Wait for the container to finish building.
 4. The container runs `shards install` automatically after creation.
 
-The devcontainer also mounts your host SSH directory into the container so Git operations can use your existing SSH keys.
+The devcontainer mounts your host SSH directory into the container so Git operations and future SSH-based host management workflows can use your existing keys.
 
 ### Option 2: Local Crystal Setup
 
@@ -53,20 +52,20 @@ shards install
 Run the app through the target defined in [shard.yml](shard.yml):
 
 ```sh
-shards run playground
+shards run homelab_manager
 ```
 
 Run the entrypoint directly with Crystal:
 
 ```sh
-crystal run src/playground.cr
+crystal run src/homelab_manager.cr
 ```
 
 Build the binary into [bin/](bin):
 
 ```sh
 shards build
-./bin/playground
+./bin/homelab_manager
 ```
 
 Run the test suite:
@@ -75,22 +74,12 @@ Run the test suite:
 crystal spec
 ```
 
-## Customize The Template After Creating A Repo
-
-Before using the generated repository for real work, update these placeholders:
-
-- Project name and target in [shard.yml](shard.yml)
-- Author metadata in [shard.yml](shard.yml)
-- Module name and documentation in [src/playground.cr](src/playground.cr)
-- Starter spec in [spec/playground_spec.cr](spec/playground_spec.cr)
-- Repository-specific text in this README
-
 ## Project Structure
 
 ```text
 .
 ├── .devcontainer/        # Devcontainer configuration
-├── .github/              # Workspace-specific Copilot instructions
+├── .github/              # Workspace-specific Copilot instructions and prompts
 ├── spec/                 # Test files
 ├── src/                  # Application source
 ├── bin/                  # Build output from shards build
@@ -98,8 +87,15 @@ Before using the generated repository for real work, update these placeholders:
 └── README.md
 ```
 
+## Next Milestones
+
+1. Define the Phase 1 domain model for hosts, approvals, execution results, and audit events.
+2. Introduce YAML inventory parsing and strict validation.
+3. Build the dry-run-first update workflow for Ubuntu hosts.
+4. Add safe remote execution boundaries and file-based audit logging.
+
 ## Notes
 
-- `shards run playground` is correct. `shard run playground` is not.
-- `crystal run` expects a source file path, so use `crystal run src/playground.cr`.
-- `crystal spec` passes in the starter template and gives you a clean baseline before you add your own tests.
+- `shards run homelab_manager` is correct. `shard run homelab_manager` is not.
+- `crystal run` expects a source file path, so use `crystal run src/homelab_manager.cr`.
+- `crystal spec` should remain green while Phase 1 is developed.
