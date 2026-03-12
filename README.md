@@ -117,6 +117,14 @@ shards run homelab_manager -- updates plan --tag updates
 shards run homelab_manager -- updates plan --approve
 ```
 
+Execute only the non-mutating update steps and write audit logs:
+
+```sh
+shards run homelab_manager -- updates dry-run
+shards run homelab_manager -- updates dry-run --tag updates
+shards run homelab_manager -- updates dry-run --approve
+```
+
 ## Inventory Format
 
 Phase 1 currently provides a validated YAML inventory baseline for host definitions.
@@ -186,6 +194,24 @@ Phase 1 now includes a non-executing update planner that builds the intended hos
 - `--approve` marks the plan as approved for preview purposes only; it does not execute the upgrade.
 - The planner uses the host-specific or default update policy from the inventory file.
 
+## Dry-Run Execution
+
+Phase 1 now also includes a dry-run execution path that runs only the non-mutating update steps.
+
+- `updates dry-run` executes refresh, preview, and reboot-check steps for each selected host.
+- The mutating `apply upgrades` step is always skipped in dry-run mode, even when `--approve` is provided.
+- Dry-run output reports per-host, per-step execution results and exit codes where available.
+- The command exits non-zero if any executed dry-run step fails.
+
+## Audit Logging
+
+Audit logging is file-based for the MVP.
+
+- Dry-run execution writes JSON line entries to `logs/audit.log`.
+- Runtime logs are ignored by Git.
+- Log entries include timestamp, operator, host, action, approval state, exit status, and sanitized command/result summaries.
+- Sensitive-looking `password=`, `passwd=`, `token=`, and `secret=` values are redacted before being written.
+
 ## Project Structure
 
 ```text
@@ -202,9 +228,9 @@ Phase 1 now includes a non-executing update planner that builds the intended hos
 
 ## Next Milestones
 
-1. Turn the update planner into command execution with explicit approval gates and dry-run-first behavior.
-2. Add per-host result capture and sanitized audit logging for planned and executed operations.
-3. Extend host selection and command reporting into richer status output.
+1. Add the real approval-gated mutating upgrade runner on top of the existing planner and dry-run path.
+2. Extend audit logging and operator reporting into richer host-by-host summaries.
+3. Add reboot-required reporting and partial-failure handling to the update execution flow.
 4. Keep the transport boundary testable while introducing real update orchestration.
 
 ## Notes

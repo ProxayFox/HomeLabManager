@@ -1,19 +1,25 @@
 module HomeLabManager
   abstract class Transport
-    DEFAULT_CONNECT_TIMEOUT_SECONDS = 5
+    DEFAULT_CONNECT_TIMEOUT_SECONDS =  5
+    DEFAULT_COMMAND_TIMEOUT_SECONDS = 30
 
     abstract def probe(host : Host, timeout_seconds : Int32 = DEFAULT_CONNECT_TIMEOUT_SECONDS) : ExecutionResult
+    abstract def run_command(host : Host, action : String, command : String, timeout_seconds : Int32 = DEFAULT_COMMAND_TIMEOUT_SECONDS) : ExecutionResult
   end
 
   class SshTransport < Transport
     private SUCCESS_SUMMARY = "ssh connectivity ok"
 
     def probe(host : Host, timeout_seconds : Int32 = DEFAULT_CONNECT_TIMEOUT_SECONDS) : ExecutionResult
+      run_command(host, "connectivity_check", "true", timeout_seconds)
+    end
+
+    def run_command(host : Host, action : String, command : String, timeout_seconds : Int32 = DEFAULT_COMMAND_TIMEOUT_SECONDS) : ExecutionResult
       stdout = IO::Memory.new
       stderr = IO::Memory.new
       status = Process.run(
         "ssh",
-        args: ssh_args(host, timeout_seconds),
+        args: ssh_args(host, timeout_seconds, command),
         output: stdout,
         error: stderr,
       )
@@ -22,7 +28,7 @@ module HomeLabManager
 
       ExecutionResult.new(
         host.name,
-        "connectivity_check",
+        action,
         status.success? ? OperationStatus::Succeeded : OperationStatus::Failed,
         exit_code: status.exit_code,
         summary: summary,
@@ -30,13 +36,13 @@ module HomeLabManager
     rescue ex
       ExecutionResult.new(
         host.name,
-        "connectivity_check",
+        action,
         OperationStatus::Failed,
-        summary: "ssh probe failed: #{ex.message}",
+        summary: "ssh command failed: #{ex.message}",
       )
     end
 
-    private def ssh_args(host : Host, timeout_seconds : Int32) : Array(String)
+    private def ssh_args(host : Host, timeout_seconds : Int32, command : String) : Array(String)
       [
         "-o", "BatchMode=yes",
         "-o", "NumberOfPasswordPrompts=0",
@@ -44,7 +50,7 @@ module HomeLabManager
         "-o", "ConnectTimeout=#{timeout_seconds}",
         "-p", host.port.to_s,
         "#{host.ssh_user}@#{host.address}",
-        "true",
+        command,
       ]
     end
 

@@ -10,7 +10,7 @@ module HomeLabManager
       selection : HostSelection,
       approve : Bool
 
-    def run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR, transport : Transport = SshTransport.new) : Int32
+    def run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR, transport : Transport = SshTransport.new, audit_logger : Audit::Logger = Audit::FileLogger.new) : Int32
       return print_help(stdout) if args.empty?
 
       case args[0]
@@ -21,7 +21,7 @@ module HomeLabManager
       when "hosts"
         run_hosts(args[1..], stdout, stderr, transport)
       when "updates"
-        run_updates(args[1..], stdout, stderr)
+        run_updates(args[1..], stdout, stderr, transport, audit_logger)
       else
         stderr.puts "Unknown command: #{args[0]}"
         stderr.puts
@@ -37,6 +37,7 @@ module HomeLabManager
       io.puts "  homelab_manager inventory list [inventory.yml] [--tag TAG] [--group GROUP]"
       io.puts "  homelab_manager hosts check [inventory.yml] [--tag TAG] [--group GROUP]"
       io.puts "  homelab_manager updates plan [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
+      io.puts "  homelab_manager updates dry-run [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
       io.puts
       io.puts "Commands:"
       io.puts "  inventory validate   Validate the inventory file before any remote action"
@@ -48,6 +49,8 @@ module HomeLabManager
       io.puts "                       Defaults to #{DEFAULT_INVENTORY_PATH}"
       io.puts "                       Supports repeated --tag and --group filters"
       io.puts "  updates plan         Build a dry-run-first update plan without executing it"
+      io.puts "                       Supports repeated --tag and --group filters and optional --approve"
+      io.puts "  updates dry-run      Execute only non-mutating update steps and write audit logs"
       io.puts "                       Supports repeated --tag and --group filters and optional --approve"
       exit_code
     end
@@ -114,7 +117,7 @@ module HomeLabManager
       1
     end
 
-    private def run_updates(args : Array(String), stdout : IO, stderr : IO) : Int32
+    private def run_updates(args : Array(String), stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger) : Int32
       subcommand = args[0]?
 
       unless subcommand
@@ -134,9 +137,19 @@ module HomeLabManager
         plans = Updates.build_plans(inventory, hosts, options.approve)
         print_update_plans(plans, stdout)
         0
+      when "dry-run"
+        inventory = Inventory.load(options.path)
+        hosts = Inventory.select_hosts(inventory, options.selection)
+        return print_empty_selection(stderr, options.selection) if hosts.empty?
+
+        plans = Updates.build_plans(inventory, hosts, options.approve)
+        runs = Updates.dry_run(plans, transport, audit_logger)
+        print_update_runs(runs, stdout)
+        stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
+        Updates.successful?(runs) ? 0 : 1
       else
         stderr.puts "Unknown updates subcommand: #{subcommand}"
-        stderr.puts "Expected: plan"
+        stderr.puts "Expected: plan, dry-run"
         1
       end
     rescue ex : InventoryError
@@ -194,6 +207,23 @@ module HomeLabManager
           io.puts "    command: #{step.command}"
           if reason = step.reason
             io.puts "    reason: #{reason}"
+          end
+        end
+      end
+    end
+
+    private def print_update_runs(runs : Array(UpdateRun), io : IO) : Nil
+      io.puts "Update dry-run: #{runs.size} host(s)"
+
+      runs.each do |run|
+        io.puts "- #{run.host.name}"
+        io.puts "  approval_state: #{run.approval_state.to_s.downcase}"
+
+        run.step_results.each do |result|
+          io.puts "  action: #{result.action} [#{result.status.to_s.downcase}]"
+          io.puts "    summary: #{result.summary}"
+          if exit_code = result.exit_code
+            io.puts "    exit_code: #{exit_code}"
           end
         end
       end

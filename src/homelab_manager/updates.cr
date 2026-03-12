@@ -40,6 +40,23 @@ module HomeLabManager
     end
   end
 
+  struct UpdateRun
+    getter host : Host
+    getter approval_state : ApprovalState
+    getter step_results : Array(ExecutionResult)
+
+    def initialize(
+      @host : Host,
+      @approval_state : ApprovalState,
+      @step_results : Array(ExecutionResult),
+    )
+    end
+
+    def successful? : Bool
+      step_results.none? { |result| result.status == OperationStatus::Failed }
+    end
+  end
+
   module Updates
     extend self
 
@@ -91,6 +108,75 @@ module HomeLabManager
       )
 
       UpdatePlan.new(host, approval_state, approval_required, steps)
+    end
+
+    def dry_run(plans : Array(UpdatePlan), transport : Transport, audit_logger : Audit::Logger = Audit::NullLogger.new, timeout_seconds : Int32 = Transport::DEFAULT_COMMAND_TIMEOUT_SECONDS) : Array(UpdateRun)
+      plans.map do |plan|
+        step_results = plan.steps.map do |step|
+          execute_dry_run_step(plan, step, transport, timeout_seconds).tap do |result|
+            audit_logger.log(result, plan.host, step.label, step.command)
+          end
+        end
+
+        UpdateRun.new(plan.host, plan.approval_state, step_results)
+      end
+    end
+
+    def successful?(runs : Array(UpdateRun)) : Bool
+      runs.all?(&.successful?)
+    end
+
+    private def execute_dry_run_step(plan : UpdatePlan, step : UpdateStep, transport : Transport, timeout_seconds : Int32) : ExecutionResult
+      if step.mutating?
+        summary = if reason = step.reason
+                    "skipped in dry-run mode; #{reason}"
+                  else
+                    "skipped in dry-run mode; mutating steps are not executed"
+                  end
+
+        return ExecutionResult.new(
+          plan.host.name,
+          action_name(step.kind),
+          OperationStatus::Skipped,
+          approval_state: plan.approval_state,
+          summary: summary,
+        )
+      end
+
+      unless step.enabled?
+        return ExecutionResult.new(
+          plan.host.name,
+          action_name(step.kind),
+          OperationStatus::Skipped,
+          approval_state: plan.approval_state,
+          summary: step.reason || "step disabled",
+        )
+      end
+
+      result = transport.run_command(plan.host, action_name(step.kind), step.command, timeout_seconds)
+      ExecutionResult.new(
+        result.host_name,
+        result.action,
+        result.status,
+        approval_state: plan.approval_state,
+        exit_code: result.exit_code,
+        summary: result.summary,
+      )
+    end
+
+    private def action_name(kind : UpdateStepKind) : String
+      case kind
+      when UpdateStepKind::RefreshPackageIndex
+        "update_refresh_package_index"
+      when UpdateStepKind::PreviewUpgrades
+        "update_preview_upgrades"
+      when UpdateStepKind::ApplyUpgrades
+        "update_apply_upgrades"
+      when UpdateStepKind::CheckRebootRequired
+        "update_check_reboot_required"
+      else
+        raise "unsupported update step kind: #{kind}"
+      end
     end
   end
 end

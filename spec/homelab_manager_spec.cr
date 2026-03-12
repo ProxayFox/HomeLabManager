@@ -35,16 +35,29 @@ def with_temp_working_directory(&)
 end
 
 class FakeTransport < HomeLabManager::Transport
-  def initialize(@results : Hash(String, HomeLabManager::ExecutionResult))
+  def initialize(
+    @probe_results : Hash(String, HomeLabManager::ExecutionResult) = {} of String => HomeLabManager::ExecutionResult,
+    @command_results : Hash(String, HomeLabManager::ExecutionResult) = {} of String => HomeLabManager::ExecutionResult,
+  )
   end
 
   def probe(host : HomeLabManager::Host, timeout_seconds : Int32 = DEFAULT_CONNECT_TIMEOUT_SECONDS) : HomeLabManager::ExecutionResult
-    @results[host.name]? || HomeLabManager::ExecutionResult.new(
+    @probe_results[host.name]? || HomeLabManager::ExecutionResult.new(
       host.name,
       "connectivity_check",
       HomeLabManager::OperationStatus::Failed,
       exit_code: 255,
       summary: "missing fake result for #{host.name}",
+    )
+  end
+
+  def run_command(host : HomeLabManager::Host, action : String, command : String, timeout_seconds : Int32 = DEFAULT_COMMAND_TIMEOUT_SECONDS) : HomeLabManager::ExecutionResult
+    @command_results["#{host.name}|#{action}"]? || HomeLabManager::ExecutionResult.new(
+      host.name,
+      action,
+      HomeLabManager::OperationStatus::Failed,
+      exit_code: 127,
+      summary: "missing fake command result for #{host.name} #{action}",
     )
   end
 end
@@ -167,6 +180,95 @@ describe HomeLabManager::Updates do
 
     plan.approval_state.should eq(HomeLabManager::ApprovalState::Approved)
     plan.steps.find!(&.mutating?).enabled?.should be_true
+  end
+
+  it "executes only non-mutating dry-run steps and skips apply upgrades" do
+    inventory = HomeLabManager::Inventory.parse <<-YAML
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+
+    plan = HomeLabManager::Updates.build_plans(inventory, inventory.hosts, false)
+    transport = FakeTransport.new(
+      command_results: {
+        "atlas|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+          "atlas",
+          "update_refresh_package_index",
+          HomeLabManager::OperationStatus::Succeeded,
+          exit_code: 0,
+          summary: "package lists refreshed",
+        ),
+        "atlas|update_preview_upgrades" => HomeLabManager::ExecutionResult.new(
+          "atlas",
+          "update_preview_upgrades",
+          HomeLabManager::OperationStatus::Succeeded,
+          exit_code: 0,
+          summary: "2 packages can be upgraded",
+        ),
+        "atlas|update_check_reboot_required" => HomeLabManager::ExecutionResult.new(
+          "atlas",
+          "update_check_reboot_required",
+          HomeLabManager::OperationStatus::Succeeded,
+          exit_code: 0,
+          summary: "reboot not required",
+        ),
+      },
+    )
+
+    runs = HomeLabManager::Updates.dry_run(plan, transport, HomeLabManager::Audit::NullLogger.new)
+    apply_step = runs.first.step_results.find! { |result| result.action == "update_apply_upgrades" }
+
+    runs.first.successful?.should be_true
+    apply_step.status.should eq(HomeLabManager::OperationStatus::Skipped)
+    apply_step.summary.should contain("dry-run mode")
+  end
+
+  it "writes sanitized audit log entries for dry runs" do
+    with_temp_working_directory do |path|
+      inventory = HomeLabManager::Inventory.parse <<-YAML
+        hosts:
+          - name: atlas
+            address: 192.168.1.10
+            ssh_user: ubuntu
+      YAML
+
+      plans = HomeLabManager::Updates.build_plans(inventory, inventory.hosts, false)
+      logger = HomeLabManager::Audit::FileLogger.new(File.join(path, "logs", "audit.log"), "tester")
+      transport = FakeTransport.new(
+        command_results: {
+          "atlas|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "update_refresh_package_index",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "token=abc123 package lists refreshed",
+          ),
+          "atlas|update_preview_upgrades" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "update_preview_upgrades",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "preview ok",
+          ),
+          "atlas|update_check_reboot_required" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "update_check_reboot_required",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "reboot not required",
+          ),
+        },
+      )
+
+      HomeLabManager::Updates.dry_run(plans, transport, logger)
+
+      audit_log = File.read(File.join(path, "logs", "audit.log"))
+      audit_log.should contain("token=[REDACTED]")
+      audit_log.should_not contain("token=abc123")
+      audit_log.should contain("\"operator\":\"tester\"")
+    end
   end
 end
 
@@ -427,6 +529,57 @@ describe HomeLabManager::CLI do
       exit_code.should eq(0)
       stdout.to_s.should contain("approval_state: approved")
       stdout.to_s.should contain("step: apply upgrades [ready]")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "executes an update dry-run and prints per-step results" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      transport = FakeTransport.new(
+        command_results: {
+          "atlas|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "update_refresh_package_index",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "package lists refreshed",
+          ),
+          "atlas|update_preview_upgrades" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "update_preview_upgrades",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "1 package can be upgraded",
+          ),
+          "atlas|update_check_reboot_required" => HomeLabManager::ExecutionResult.new(
+            "atlas",
+            "update_check_reboot_required",
+            HomeLabManager::OperationStatus::Succeeded,
+            exit_code: 0,
+            summary: "reboot not required",
+          ),
+        },
+      )
+
+      exit_code = HomeLabManager::CLI.run(
+        ["updates", "dry-run", path],
+        stdout,
+        stderr,
+        transport,
+        HomeLabManager::Audit::NullLogger.new,
+      )
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("Update dry-run: 1 host(s)")
+      stdout.to_s.should contain("action: update_refresh_package_index [succeeded]")
+      stdout.to_s.should contain("action: update_apply_upgrades [skipped]")
       stderr.to_s.should eq("")
     end
   end

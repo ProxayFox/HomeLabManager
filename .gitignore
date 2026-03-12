@@ -6,3 +6,4 @@
 /.shards/
 *.dwarf
 config/inventory.yml
+logs/

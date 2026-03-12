@@ -1,10 +1,12 @@
 require "yaml"
 require "set"
+require "json"
 
 require "./domain"
 require "./inventory"
 require "./transport"
 require "./connectivity"
+require "./audit"
 require "./updates"
 require "./cli"
 
