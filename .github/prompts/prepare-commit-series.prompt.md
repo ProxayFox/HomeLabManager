@@ -12,6 +12,7 @@ Requirements:
 - Group files by coherent change intent rather than by directory alone.
 - Prefer small, reviewable commits with clear messages.
 - Call out any files that should stay unstaged because they are ignored, generated, or unrelated.
+- Treat `.github/plans/` and other ignored local-planning material as intentionally unstaged unless the user explicitly wants otherwise.
 - If a file mixes multiple concerns, suggest whether `git add -p` is warranted.
 - Do not actually run `git commit` unless the user explicitly asks for execution.
 

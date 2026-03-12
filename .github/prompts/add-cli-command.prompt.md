@@ -12,13 +12,14 @@ Requirements:
 - Reuse the structured error behavior in [src/homelab_manager/cli/error_output.cr](../src/homelab_manager/cli/error_output.cr) when the new command can fail.
 - Keep the safety model intact: do not introduce mutating behavior without explicit approval and `--execute` style guards when applicable.
 - Prefer extending the existing domain, inventory, transport, connectivity, updates, or audit modules instead of adding a generic utility layer.
-- Add or update focused specs under [spec/](../spec/) using the helpers in [spec/spec_helper.cr](../spec/spec_helper.cr).
+- Add or update the nearest focused specs under [spec/](../spec/) using the helpers in [spec/spec_helper.cr](../spec/spec_helper.cr).
+- If the command changes operator-facing behavior or JSON output, update the matching docs under [wiki/architecture/](../../wiki/architecture/cli-behavior.md), [wiki/operations/](../../wiki/operations/update-runbook.md), or [wiki/reference/](../../wiki/reference/json-output-reference.md) as needed.
 - Run `crystal spec` after the change. If the command surface or build wiring changed, also run `shards build`.
 
 Expected workflow:
 1. Inspect the existing command family and nearby specs before editing.
 2. Implement the smallest cohesive source change that fits the current module boundaries.
-3. Add or update specs for success, failure, and JSON output where relevant.
+3. Add or update specs for success, failure, guards, and JSON output where relevant.
 4. Run verification commands and report the results clearly.
 
 User request:

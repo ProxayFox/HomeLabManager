@@ -20,6 +20,7 @@ Requirements:
 - Include rollback or fallback notes for high-risk changes when realistic. If rollback would be manual or operational, say that clearly.
 - Include a short review checkpoint after major phases when the plan should be re-evaluated based on what was learned.
 - Estimate effort or critical-path sequencing only when it materially improves the plan; avoid fake precision.
+- When the work is substantial enough to deserve an implementation plan, make the output suitable for a committed or local plan file under `.github/plans/`.
 - Do not describe future work as already implemented.
 
 Plan structure:
