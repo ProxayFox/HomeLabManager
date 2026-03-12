@@ -12,14 +12,20 @@
 - Uses devcontainer with Crystal language image
 - Crystal 1.19.1 and Shards are available in the container
 - Devcontainer `postCreateCommand` runs `shards install`
+- The devcontainer mounts the operator's SSH directory so Git and SSH-based host workflows can use existing keys
+- Ameba is installed globally in the devcontainer; `crystal spec` shells out to `ameba --config .ameba.yml` through `spec/ameba_spec.cr`
 
 ## Architecture
 
-- Source code lives in `src/`
-- Tests live in `spec/`
-- Entry point and main target: `src/homelab_manager.cr`
-- Project manifest: `shard.yml`
-- There are no external dependencies yet
+- Entry point and main target: `src/homelab_manager.cr`, which dispatches to `HomeLabManager::CLI.run(ARGV)`
+- Core domain types live in `src/homelab_manager/domain.cr`
+- Inventory parsing and validation live in `src/homelab_manager/inventory.cr`
+- SSH transport abstractions live in `src/homelab_manager/transport.cr`
+- Connectivity checks live in `src/homelab_manager/connectivity.cr`
+- Update planning and execution live in `src/homelab_manager/updates.cr` and `src/homelab_manager/updates/state.cr`
+- Audit logging lives in `src/homelab_manager/audit.cr`
+- CLI parsing, dispatch, and error formatting live in `src/homelab_manager/cli.cr` and `src/homelab_manager/cli/error_output.cr`
+- Tests live in `spec/`, with shared helpers in `spec/spec_helper.cr`
 
 ## Conventions
 
@@ -33,11 +39,16 @@
 - Split mixed-responsibility files along clear boundaries such as parsing, option handling, output rendering, domain models, execution flow, and shared helper methods
 - Mirror major source splits in `spec/` with focused spec files so tests stay close to the concern they cover
 - Favor names that describe the concern directly, such as `cli/options.cr`, `cli/output.cr`, `updates/planner.cr`, `updates/runner.cr`, or `inventory/validation.cr`, over generic suffixes unless the file truly holds shared utilities for that module
+- Prefer Crystal stdlib serialization (`YAML::Serializable`, `JSON::Serializable`) over custom parsing when the model fits the file format
+- Keep transport boundaries injectable so command orchestration can be tested with `FakeTransport` instead of real SSH hosts
+- Treat `config/inventory.yml`, `logs/audit.log`, and `state/update-runs.json` as operator/runtime data, not source-controlled fixtures
+- Preserve the safety model: dry-run and plan commands remain non-mutating, and real update execution should continue to require explicit approval and `--execute`
 
 ## Build and Test
 
 - Run the app with `shards run homelab_manager` or `crystal run src/homelab_manager.cr`
 - Build the app with `shards build`; this writes the binary to `bin/homelab_manager` based on the target declared in `shard.yml`
 - Run tests with `crystal spec`
-- The spec suite enforces the 800-line limit for Crystal files under `src/` and `spec/`
-- Keep the baseline suite passing; extend `spec/homelab_manager_spec.cr` or replace it with real tests as the project evolves
+- `crystal spec` also runs Ameba and the 800-line file-length check
+- Use `shards run homelab_manager -- inventory validate` to validate inventory changes before touching connectivity or update flows
+- Prefer focused specs near the affected concern, such as `spec/cli_spec.cr`, `spec/updates_spec.cr`, and `spec/update_state_spec.cr`, instead of growing a single catch-all spec file
