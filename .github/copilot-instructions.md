@@ -25,6 +25,7 @@
 - Update planning and execution live in `src/homelab_manager/updates.cr` and `src/homelab_manager/updates/state.cr`
 - Audit logging lives in `src/homelab_manager/audit.cr`
 - CLI parsing, dispatch, and error formatting live in `src/homelab_manager/cli.cr` and `src/homelab_manager/cli/error_output.cr`
+- Command-family output helpers can be split under `src/homelab_manager/cli/`, such as inventory, hosts, and update output renderers
 - Tests live in `spec/`, with shared helpers in `spec/spec_helper.cr`
 
 ## Conventions
@@ -39,6 +40,7 @@
 - Split mixed-responsibility files along clear boundaries such as parsing, option handling, output rendering, domain models, execution flow, and shared helper methods
 - Mirror major source splits in `spec/` with focused spec files so tests stay close to the concern they cover
 - Favor names that describe the concern directly, such as `cli/options.cr`, `cli/output.cr`, `updates/planner.cr`, `updates/runner.cr`, or `inventory/validation.cr`, over generic suffixes unless the file truly holds shared utilities for that module
+- When CLI output starts to sprawl for one command family, extract it into a dedicated helper under `src/homelab_manager/cli/` instead of growing `cli.cr` indefinitely
 - Prefer Crystal stdlib serialization (`YAML::Serializable`, `JSON::Serializable`) over custom parsing when the model fits the file format
 - Keep transport boundaries injectable so command orchestration can be tested with `FakeTransport` instead of real SSH hosts
 - Treat `config/inventory.yml`, `logs/audit.log`, and `state/update-runs.json` as operator/runtime data, not source-controlled fixtures
