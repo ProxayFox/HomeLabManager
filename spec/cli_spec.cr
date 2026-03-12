@@ -391,6 +391,51 @@ describe HomeLabManager::CLI do
       exit_code.should eq(0)
       stdout.to_s.should contain("\"type\":\"update-plan\"")
       stdout.to_s.should contain("\"host\":\"atlas\"")
+      stdout.to_s.should contain("\"resume_context\":null")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "renders persisted recovery context in update plan json" do
+    with_temp_working_directory do |path|
+      inventory_path = File.join(path, "inventory.yml")
+      File.write(
+        inventory_path,
+        <<-YAML
+          hosts:
+            - name: atlas
+              address: 192.168.1.10
+              ssh_user: ubuntu
+        YAML
+      )
+
+      state_store = HomeLabManager::Updates::StateStore.new(File.join(path, HomeLabManager::CLI::DEFAULT_UPDATE_STATE_PATH))
+      state_store.record_runs([
+        HomeLabManager::UpdateRun.new(
+          HomeLabManager::Inventory.load(inventory_path).hosts.first,
+          HomeLabManager::ApprovalState::Approved,
+          [
+            HomeLabManager::ExecutionResult.new(
+              "atlas",
+              "update_apply_upgrades",
+              HomeLabManager::OperationStatus::Failed,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 100,
+              summary: "apt failed",
+            ),
+          ],
+          false,
+        ),
+      ])
+
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["updates", "plan", inventory_path, "--approve", "--json"], stdout, stderr)
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("\"resume_context\":{\"source\":\"persisted\"")
+      stdout.to_s.should contain("\"resume_from\":\"update_apply_upgrades\"")
       stderr.to_s.should eq("")
     end
   end
@@ -659,8 +704,68 @@ describe HomeLabManager::CLI do
 
       exit_code.should eq(0)
       stdout.to_s.should contain("\"type\":\"update-dry-run\"")
+      stdout.to_s.should contain("\"resume_context\":null")
       stdout.to_s.should contain("\"overall_status\":\"succeeded\"")
       stdout.to_s.should contain("\"action\":\"update_apply_upgrades\"")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "renders persisted recovery context in update run json" do
+    with_temp_working_directory do |path|
+      inventory_path = File.join(path, "inventory.yml")
+      File.write(
+        inventory_path,
+        <<-YAML
+          hosts:
+            - name: atlas
+              address: 192.168.1.10
+              ssh_user: ubuntu
+        YAML
+      )
+
+      state_store = HomeLabManager::Updates::StateStore.new(File.join(path, HomeLabManager::CLI::DEFAULT_UPDATE_STATE_PATH))
+      state_store.record_runs([
+        HomeLabManager::UpdateRun.new(
+          HomeLabManager::Inventory.load(inventory_path).hosts.first,
+          HomeLabManager::ApprovalState::Approved,
+          [
+            HomeLabManager::ExecutionResult.new(
+              "atlas",
+              "update_apply_upgrades",
+              HomeLabManager::OperationStatus::Failed,
+              approval_state: HomeLabManager::ApprovalState::Approved,
+              exit_code: 100,
+              summary: "apt failed",
+            ),
+          ],
+          false,
+        ),
+      ])
+
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      transport = FakeTransport.new(
+        command_results: {
+          "atlas|update_apply_upgrades" => HomeLabManager::ExecutionResult.new(
+            "atlas", "update_apply_upgrades", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "packages upgraded"),
+          "atlas|update_check_reboot_required" => HomeLabManager::ExecutionResult.new(
+            "atlas", "update_check_reboot_required", HomeLabManager::OperationStatus::Failed, exit_code: 1, summary: "flag absent"),
+        },
+      )
+
+      exit_code = HomeLabManager::CLI.run(
+        ["updates", "run", inventory_path, "--approve", "--execute", "--json"],
+        stdout,
+        stderr,
+        transport,
+        HomeLabManager::Audit::NullLogger.new,
+      )
+
+      exit_code.should eq(0)
+      stdout.to_s.should contain("\"type\":\"update-run\"")
+      stdout.to_s.should contain("\"resume_context\":{\"source\":\"persisted\"")
+      stdout.to_s.should contain("\"resume_from\":\"update_apply_upgrades\"")
       stderr.to_s.should eq("")
     end
   end

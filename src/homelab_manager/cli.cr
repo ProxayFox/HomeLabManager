@@ -197,9 +197,10 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
+      recovery_entries = persisted_recovery_entries(options, hosts, state_store)
       plans = resolve_update_plans(options, inventory, hosts, state_store)
       if options.json
-        print_update_plans_json(plans, stdout)
+        print_update_plans_json(plans, stdout, recovery_entries)
       else
         print_update_plans(plans, stdout)
       end
@@ -211,10 +212,11 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
+      recovery_entries = persisted_recovery_entries(options, hosts, state_store)
       plans = resolve_update_plans(options, inventory, hosts, state_store)
       runs = Updates.dry_run(plans, transport, audit_logger)
       if options.json
-        print_update_runs_json("dry-run", runs, stdout)
+        print_update_runs_json("dry-run", runs, stdout, recovery_entries)
       else
         print_update_runs("Update dry-run", runs, stdout)
       end
@@ -242,14 +244,15 @@ module HomeLabManager
       return 1 unless loaded
 
       inventory, hosts = loaded
+      recovery_entries = persisted_recovery_entries(options, hosts, state_store)
       plans = resolve_update_plans(options, inventory, hosts, state_store)
       runs = Updates.execute(plans, transport, audit_logger)
-      state_store.record_runs(runs)
       if options.json
-        print_update_runs_json("run", runs, stdout)
+        print_update_runs_json("run", runs, stdout, recovery_entries)
       else
         print_update_runs("Update run", runs, stdout)
       end
+      state_store.record_runs(runs)
       stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
       Updates.successful?(runs) ? 0 : 1
     end
@@ -464,7 +467,7 @@ module HomeLabManager
       io.puts "Summary: #{succeeded_count} succeeded, #{partial_count} partial, #{failed_count} failed"
     end
 
-    private def print_update_plans_json(plans : Array(UpdatePlan), io : IO) : Nil
+    private def print_update_plans_json(plans : Array(UpdatePlan), io : IO, recovery_entries : Hash(String, Updates::RecoveryStateEntry) = {} of String => Updates::RecoveryStateEntry) : Nil
       JSON.build(io) do |json|
         json.object do
           json.field "type", "update-plan"
@@ -473,6 +476,9 @@ module HomeLabManager
               plans.each do |plan|
                 json.object do
                   json.field "host", plan.host.name
+                  json.field "resume_context" do
+                    print_resume_context_json(json, recovery_entries[plan.host.name]?)
+                  end
                   json.field "approval_state", plan.approval_state.to_s.downcase
                   json.field "approval_required", plan.approval_required?
                   json.field "steps" do
@@ -498,7 +504,7 @@ module HomeLabManager
       io.puts
     end
 
-    private def print_update_runs_json(mode : String, runs : Array(UpdateRun), io : IO) : Nil
+    private def print_update_runs_json(mode : String, runs : Array(UpdateRun), io : IO, recovery_entries : Hash(String, Updates::RecoveryStateEntry) = {} of String => Updates::RecoveryStateEntry) : Nil
       JSON.build(io) do |json|
         json.object do
           json.field "type", "update-#{mode}"
@@ -514,6 +520,9 @@ module HomeLabManager
               runs.each do |run|
                 json.object do
                   json.field "host", run.host.name
+                  json.field "resume_context" do
+                    print_resume_context_json(json, recovery_entries[run.host.name]?)
+                  end
                   json.field "overall_status", run.overall_status
                   json.field "approval_state", run.approval_state.to_s.downcase
                   json.field "reboot_required", run.reboot_required
@@ -650,6 +659,31 @@ module HomeLabManager
         Updates.build_plans(inventory, hosts, options.approve, resume_from)
       else
         Updates.build_plans(inventory, hosts, options.approve, resume_points: state_store.resume_points(hosts))
+      end
+    end
+
+    private def persisted_recovery_entries(
+      options : CommandOptions,
+      hosts : Array(Host),
+      state_store : Updates::StateStore,
+    ) : Hash(String, Updates::RecoveryStateEntry)
+      return {} of String => Updates::RecoveryStateEntry if options.resume_from
+
+      state_store.recovery_entries(hosts)
+    end
+
+    private def print_resume_context_json(json : JSON::Builder, entry : Updates::RecoveryStateEntry?) : Nil
+      if entry
+        json.object do
+          json.field "source", "persisted"
+          json.field "resume_from", entry.failed_action
+          json.field "updated_at", entry.updated_at
+          json.field "summary", entry.summary
+          json.field "overall_status", entry.overall_status
+          json.field "reboot_required", entry.reboot_required
+        end
+      else
+        json.null
       end
     end
 

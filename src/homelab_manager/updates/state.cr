@@ -40,16 +40,27 @@ module HomeLabManager
       end
 
       def resume_points(hosts : Array(Host)) : Hash(String, UpdateStepKind)
-        entries = load.hosts
+        entries = recovery_entries(hosts)
         points = {} of String => UpdateStepKind
 
-        hosts.each do |host|
-          next unless entry = entries.find { |candidate| candidate.host_name == host.name }
-
-          points[host.name] = Updates.parse_resume_from(entry.failed_action)
+        entries.each do |host_name, entry|
+          points[host_name] = Updates.parse_resume_from(entry.failed_action)
         end
 
         points
+      end
+
+      def recovery_entries(hosts : Array(Host)) : Hash(String, RecoveryStateEntry)
+        indexed_entries = load.hosts.to_h { |entry| {entry.host_name, entry} }
+        selected_entries = {} of String => RecoveryStateEntry
+
+        hosts.each do |host|
+          next unless entry = indexed_entries[host.name]?
+
+          selected_entries[host.name] = entry
+        end
+
+        selected_entries
       end
 
       def record_runs(runs : Array(UpdateRun)) : Nil

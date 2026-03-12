@@ -264,7 +264,7 @@ Inventory, connectivity, and update commands now support machine-readable JSON o
 - `inventory list --json` emits the selected hosts, filters, and effective update policy.
 - `hosts check --json` emits per-host connectivity results plus a success/failure summary.
 - `updates plan --json` emits the selected hosts, approval state, and planned steps.
-- `updates dry-run --json` and `updates run --json` emit per-host summaries, reboot-required state, and per-step results.
+- `updates dry-run --json` and `updates run --json` emit per-host summaries, reboot-required state, per-step results, and persisted resume context when a host was auto-resumed.
 - When `--json` is present and a command fails, the CLI emits a JSON error payload on stderr with a category, command context, and error list.
 - Human-readable output remains the default when `--json` is not provided.
 
