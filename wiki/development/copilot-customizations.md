@@ -36,6 +36,7 @@ Examples already present in this repository include guidance for:
 - Crystal spec files,
 - documentation,
 - update workflow changes,
+- project plan files,
 - agent customization files themselves.
 
 Good scoped instructions are:
@@ -50,6 +51,7 @@ Use prompts for repeatable workflows that a contributor may want to invoke inten
 
 - preparing a commit series,
 - drafting release notes,
+- building a phased project plan,
 - walking through a focused review or authoring flow.
 
 Prompts should stay executable and task-oriented. They should not become private notes or broad static policy dumps.
@@ -101,3 +103,8 @@ If you are working on the docs or customization system itself, also see:
 - [Development Guide](development-guide.md)
 - [Contributor Workflow](contributor-workflow.md)
 - [Testing Strategy](testing-strategy.md)
+
+Planning-specific files in this repository:
+
+- `.github/prompts/build-project-plan.prompt.md`
+- `.github/instructions/project-plans.instructions.md`
