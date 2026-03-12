@@ -8,23 +8,32 @@ The main [README](../README.md) stays focused on project goals, operator usage, 
 
 ### Architecture
 
-- [Architecture Overview](architecture.md): module responsibilities, data flow, and extension points.
-- [Command Flow](command-flow.md): how CLI commands move from parsing to inventory loading, transport execution, audit logging, and recovery state.
-- [Inventory Model](inventory-model.md): YAML schema, validation rules, and host selection behavior.
-- [CLI Behavior](cli-behavior.md): command parsing, option support, output modes, and error rendering.
+- [Architecture Overview](architecture/overview.md): module responsibilities, data flow, and extension points.
+- [Command Flow](architecture/command-flow.md): how CLI commands move from parsing to inventory loading, transport execution, audit logging, and recovery state.
+- [Inventory Model](architecture/inventory-model.md): YAML schema, validation rules, and host selection behavior.
+- [CLI Behavior](architecture/cli-behavior.md): command parsing, option support, output modes, and error rendering.
 
 ### Runtime Behavior
 
-- [Update Recovery](update-recovery.md): persisted failure state, resume points, and recovery semantics.
-- [Transport and SSH](transport-and-ssh.md): transport abstraction, SSH command behavior, and timeout semantics.
-- [Audit Logging](audit-logging.md): audit logger types, log shape, and sanitization rules.
-- [JSON Output Reference](json-output-reference.md): machine-readable payload shapes emitted by CLI commands.
+- [Update Recovery](runtime/update-recovery.md): persisted failure state, resume points, and recovery semantics.
+- [Transport and SSH](runtime/transport-and-ssh.md): transport abstraction, SSH command behavior, and timeout semantics.
+- [Audit Logging](runtime/audit-logging.md): audit logger types, log shape, and sanitization rules.
+
+### Operations
+
+- [Inventory Runbook](operations/inventory-runbook.md): how to create, validate, and inspect operator inventory safely.
+- [Connectivity Runbook](operations/connectivity-runbook.md): how to confirm SSH reachability before update work.
+- [Update Runbook](operations/update-runbook.md): how to move from plan to dry-run to execution and recovery.
+
+### Reference
+
+- [JSON Output Reference](reference/json-output-reference.md): machine-readable payload shapes emitted by CLI commands.
 
 ### Development
 
-- [Development Guide](development-guide.md): local workflow, testing expectations, and file layout conventions.
-- [Testing Strategy](testing-strategy.md): how specs are organized and how transport-dependent behavior is tested safely.
-- [Contributor Workflow](contributor-workflow.md): how to add or change features without breaking the safety model or repo structure.
+- [Development Guide](development/development-guide.md): local workflow, testing expectations, and file layout conventions.
+- [Testing Strategy](development/testing-strategy.md): how specs are organized and how transport-dependent behavior is tested safely.
+- [Contributor Workflow](development/contributor-workflow.md): how to add or change features without breaking the safety model or repo structure.
 
 ## Intended Use
 

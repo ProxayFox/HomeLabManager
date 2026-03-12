@@ -52,17 +52,20 @@ shards install
 Repository-local implementation docs now live under [wiki/](wiki/README.md).
 
 - Start with [wiki/README.md](wiki/README.md) for the docs index.
-- See [wiki/architecture.md](wiki/architecture.md) for module responsibilities and extension points.
-- See [wiki/command-flow.md](wiki/command-flow.md) for CLI-to-runtime execution flow.
-- See [wiki/development-guide.md](wiki/development-guide.md) for development and testing conventions.
-- See [wiki/inventory-model.md](wiki/inventory-model.md) for inventory structure and selection semantics.
-- See [wiki/testing-strategy.md](wiki/testing-strategy.md) for spec organization and test doubles.
-- See [wiki/cli-behavior.md](wiki/cli-behavior.md) for command parsing, output modes, and error handling.
-- See [wiki/update-recovery.md](wiki/update-recovery.md) for persisted recovery state and resume behavior.
-- See [wiki/transport-and-ssh.md](wiki/transport-and-ssh.md) for SSH execution details and transport boundaries.
-- See [wiki/audit-logging.md](wiki/audit-logging.md) for audit log format and sanitization rules.
-- See [wiki/contributor-workflow.md](wiki/contributor-workflow.md) for how to extend the repo safely.
-- See [wiki/json-output-reference.md](wiki/json-output-reference.md) for CLI JSON payload shapes.
+- See [wiki/architecture/overview.md](wiki/architecture/overview.md) for module responsibilities and extension points.
+- See [wiki/architecture/command-flow.md](wiki/architecture/command-flow.md) for CLI-to-runtime execution flow.
+- See [wiki/development/development-guide.md](wiki/development/development-guide.md) for development and testing conventions.
+- See [wiki/architecture/inventory-model.md](wiki/architecture/inventory-model.md) for inventory structure and selection semantics.
+- See [wiki/development/testing-strategy.md](wiki/development/testing-strategy.md) for spec organization and test doubles.
+- See [wiki/architecture/cli-behavior.md](wiki/architecture/cli-behavior.md) for command parsing, output modes, and error handling.
+- See [wiki/runtime/update-recovery.md](wiki/runtime/update-recovery.md) for persisted recovery state and resume behavior.
+- See [wiki/runtime/transport-and-ssh.md](wiki/runtime/transport-and-ssh.md) for SSH execution details and transport boundaries.
+- See [wiki/runtime/audit-logging.md](wiki/runtime/audit-logging.md) for audit log format and sanitization rules.
+- See [wiki/development/contributor-workflow.md](wiki/development/contributor-workflow.md) for how to extend the repo safely.
+- See [wiki/reference/json-output-reference.md](wiki/reference/json-output-reference.md) for CLI JSON payload shapes.
+- See [wiki/operations/inventory-runbook.md](wiki/operations/inventory-runbook.md) for the operator workflow around inventory setup and validation.
+- See [wiki/operations/connectivity-runbook.md](wiki/operations/connectivity-runbook.md) for the SSH verification workflow before update work.
+- See [wiki/operations/update-runbook.md](wiki/operations/update-runbook.md) for the end-to-end update and recovery workflow.
 
 ## Common Commands
 
@@ -309,5 +312,7 @@ Inventory, connectivity, and update commands now support machine-readable JSON o
 ## Notes
 
 - `shards run homelab_manager` is correct. `shard run homelab_manager` is not.
+- `crystal run` expects a source file path, so use `crystal run src/homelab_manager.cr`.
+- `crystal spec` should remain green while Phase 1 is developed.
 - `crystal run` expects a source file path, so use `crystal run src/homelab_manager.cr`.
 - `crystal spec` should remain green while Phase 1 is developed.
