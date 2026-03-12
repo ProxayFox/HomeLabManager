@@ -51,4 +51,4 @@
 - Run tests with `crystal spec`
 - `crystal spec` also runs Ameba and the 800-line file-length check
 - Use `shards run homelab_manager -- inventory validate` to validate inventory changes before touching connectivity or update flows
-- Prefer focused specs near the affected concern, such as `spec/cli_spec.cr`, `spec/updates_spec.cr`, and `spec/update_state_spec.cr`, instead of growing a single catch-all spec file
+- Prefer focused specs near the affected concern, such as `spec/cli_inventory_spec.cr`, `spec/cli_hosts_spec.cr`, `spec/cli_updates_spec.cr`, `spec/updates_spec.cr`, and `spec/update_state_spec.cr`, instead of growing a single catch-all spec file
