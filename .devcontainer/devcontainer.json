@@ -1,0 +1,26 @@
+{
+  "name": "Crystal Dev Container",
+  "build": {
+    "dockerfile": "dockerfile",
+    "args": {
+      "crystal_version": "1.19.1",
+      "crystal_release": "1"
+    }
+  },
+
+  // Mount the host's .ssh directory to the container, so that git operations can use the host's SSH keys.
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "crystal-lang-tools.crystal-lang",
+        "veelenga.crystal-ameba"
+      ]
+    }
+  },
+  "postCreateCommand": "shards install",
+  "remoteUser": "vscode"
+}

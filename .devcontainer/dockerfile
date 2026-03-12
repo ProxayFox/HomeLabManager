@@ -1,0 +1,21 @@
+FROM mcr.microsoft.com/devcontainers/base:trixie
+
+RUN \
+  apt-get update && \
+  apt-get install -y apt-transport-https && \
+  apt-get update && \
+  DEBIAN_FRONTEND=noninteractive \
+  apt-get install -y tzdata gcc pkg-config libssl-dev libxml2-dev libyaml-dev libgmp-dev git make \
+  libpcre2-dev libz-dev libgc-dev && \
+  apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ARG TARGETARCH
+ARG crystal_version=1.19.1
+ARG crystal_release=1
+
+RUN \
+  CRYSTAL_ARCH=$(case "${TARGETARCH}" in amd64) echo "x86_64" ;; arm64) echo "aarch64" ;; *) echo "${TARGETARCH}" ;; esac) && \
+  curl -fsSL -o /tmp/crystal.tar.gz \
+  "https://github.com/crystal-lang/crystal/releases/download/${crystal_version}/crystal-${crystal_version}-${crystal_release}-linux-${CRYSTAL_ARCH}.tar.gz" && \
+  tar -xz -C /usr --strip-component=1 -f /tmp/crystal.tar.gz && \
+  rm /tmp/crystal.tar.gz
