@@ -7,12 +7,6 @@ authors:
 targets:
   homelab_manager:
     main: src/homelab_manager.cr
-  ameba:
-    main: bin/ameba.cr
-
-development_dependencies:
-  ameba:
-    github: crystal-ameba/ameba
 
 crystal: '>= 1.19.1'
 
