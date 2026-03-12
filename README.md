@@ -66,6 +66,10 @@ Repository-local implementation docs now live under [wiki/](wiki/README.md).
 - See [wiki/operations/inventory-runbook.md](wiki/operations/inventory-runbook.md) for the operator workflow around inventory setup and validation.
 - See [wiki/operations/connectivity-runbook.md](wiki/operations/connectivity-runbook.md) for the SSH verification workflow before update work.
 - See [wiki/operations/update-runbook.md](wiki/operations/update-runbook.md) for the end-to-end update and recovery workflow.
+- See [wiki/operations/quick-start-workflow.md](wiki/operations/quick-start-workflow.md) for the shortest safe operator checklist.
+- See [wiki/operations/troubleshooting.md](wiki/operations/troubleshooting.md) for common failure modes and recovery guidance.
+- See [wiki/development/release-and-build.md](wiki/development/release-and-build.md) for current build, version, and release expectations.
+- See [wiki/development/copilot-customizations.md](wiki/development/copilot-customizations.md) for repository conventions around instructions, prompts, ignored plans, and planning files.
 
 ## Common Commands
 

@@ -24,6 +24,24 @@ The data model is represented by:
 - `RecoveryStateFile`
 - `Updates::StateStore`
 
+Example state file fragment:
+
+```json
+{
+	"version": 1,
+	"hosts": [
+		{
+			"host_name": "atlas",
+			"failed_action": "update_apply_upgrades",
+			"updated_at": "2026-03-12T12:34:56Z",
+			"summary": "apt failed",
+			"overall_status": "failed",
+			"reboot_required": false
+		}
+	]
+}
+```
+
 ## When State Is Written
 
 Persisted recovery state is only updated during `updates run`.
@@ -68,6 +86,21 @@ This has two important consequences:
 - persisted recovery entries are omitted from the JSON `resume_context` path because the source is no longer the saved state file.
 
 This makes the operator override explicit and avoids blending automatic and manual recovery sources together.
+
+Example `resume_context` fragment in command JSON output:
+
+```json
+{
+	"resume_context": {
+		"source": "persisted",
+		"resume_from": "update_apply_upgrades",
+		"updated_at": "2026-03-12T12:34:56Z",
+		"summary": "apt failed",
+		"overall_status": "failed",
+		"reboot_required": false
+	}
+}
+```
 
 ## Planner Behavior During Resume
 

@@ -102,6 +102,21 @@ Current error categories include:
 - `selection`
 - `execution-guard`
 
+Example JSON error payload:
+
+```json
+{
+	"type": "error",
+	"category": "selection",
+	"command": "hosts",
+	"subcommand": "check",
+	"errors": [
+		"no hosts matched the requested filters",
+		"groups: missing"
+	]
+}
+```
+
 That separation keeps successful machine-readable output on `stdout` and error payloads on `stderr`, which is the right behavior for shell pipelines and automation.
 
 ## Execution Guards

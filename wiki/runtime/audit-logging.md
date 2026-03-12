@@ -38,6 +38,24 @@ Each entry is written as one JSON object per line. The current fields are:
 
 This format is compact enough for line-oriented tooling while still being readable in plain text.
 
+Example log line:
+
+```json
+{
+	"timestamp": "2026-03-12T12:34:56Z",
+	"operator": "tester",
+	"host": "atlas",
+	"address": "192.168.1.10",
+	"action": "update_preview_upgrades",
+	"step_label": "preview upgrades",
+	"status": "succeeded",
+	"approval_state": "pending",
+	"exit_code": 0,
+	"command": "sudo apt-get -s upgrade",
+	"summary": "2 packages can be upgraded"
+}
+```
+
 ## Operator Name
 
 `FileLogger` resolves the operator name from the environment:
