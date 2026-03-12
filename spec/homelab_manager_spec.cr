@@ -225,6 +225,61 @@ describe HomeLabManager::Updates do
     apply_step.summary.should contain("dry-run mode")
   end
 
+  it "executes approved mutating steps and reports reboot-required state" do
+    inventory = HomeLabManager::Inventory.parse <<-YAML
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+
+    plans = HomeLabManager::Updates.build_plans(inventory, inventory.hosts, true)
+    transport = FakeTransport.new(
+      command_results: {
+        "atlas|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+          "atlas", "update_refresh_package_index", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "package lists refreshed"),
+        "atlas|update_preview_upgrades" => HomeLabManager::ExecutionResult.new(
+          "atlas", "update_preview_upgrades", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "2 packages can be upgraded"),
+        "atlas|update_apply_upgrades" => HomeLabManager::ExecutionResult.new(
+          "atlas", "update_apply_upgrades", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "packages upgraded"),
+        "atlas|update_check_reboot_required" => HomeLabManager::ExecutionResult.new(
+          "atlas", "update_check_reboot_required", HomeLabManager::OperationStatus::Failed, exit_code: 0, summary: "flag present"),
+      },
+    )
+
+    runs = HomeLabManager::Updates.execute(plans, transport, HomeLabManager::Audit::NullLogger.new)
+    apply_step = runs.first.step_results.find! { |result| result.action == "update_apply_upgrades" }
+
+    runs.first.successful?.should be_true
+    runs.first.reboot_required.should eq(true)
+    apply_step.status.should eq(HomeLabManager::OperationStatus::Succeeded)
+  end
+
+  it "skips remaining update steps after a host failure" do
+    inventory = HomeLabManager::Inventory.parse <<-YAML
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+
+    plans = HomeLabManager::Updates.build_plans(inventory, inventory.hosts, true)
+    transport = FakeTransport.new(
+      command_results: {
+        "atlas|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+          "atlas", "update_refresh_package_index", HomeLabManager::OperationStatus::Failed, exit_code: 100, summary: "apt failed"),
+      },
+    )
+
+    runs = HomeLabManager::Updates.execute(plans, transport, HomeLabManager::Audit::NullLogger.new)
+    preview_step = runs.first.step_results.find! { |result| result.action == "update_preview_upgrades" }
+
+    runs.first.successful?.should be_false
+    runs.first.partially_failed?.should be_true
+    preview_step.status.should eq(HomeLabManager::OperationStatus::Skipped)
+    preview_step.summary.should contain("previous step failure")
+  end
+
   it "writes sanitized audit log entries for dry runs" do
     with_temp_working_directory do |path|
       inventory = HomeLabManager::Inventory.parse <<-YAML
@@ -578,8 +633,73 @@ describe HomeLabManager::CLI do
 
       exit_code.should eq(0)
       stdout.to_s.should contain("Update dry-run: 1 host(s)")
+      stdout.to_s.should contain("overall_status: succeeded")
       stdout.to_s.should contain("action: update_refresh_package_index [succeeded]")
       stdout.to_s.should contain("action: update_apply_upgrades [skipped]")
+      stdout.to_s.should contain("Summary: 1 succeeded, 0 partial, 0 failed")
+      stderr.to_s.should eq("")
+    end
+  end
+
+  it "requires --execute before running mutating updates" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+
+      exit_code = HomeLabManager::CLI.run(["updates", "run", path], stdout, stderr)
+
+      exit_code.should eq(1)
+      stderr.to_s.should contain("Refusing to run mutating updates without --execute")
+    end
+  end
+
+  it "executes approved updates and reports partial failures" do
+    with_temp_inventory <<-YAML do |path|
+      hosts:
+        - name: atlas
+          address: 192.168.1.10
+          ssh_user: ubuntu
+        - name: backup
+          address: backup.internal
+          ssh_user: admin
+    YAML
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      transport = FakeTransport.new(
+        command_results: {
+          "atlas|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+            "atlas", "update_refresh_package_index", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "package lists refreshed"),
+          "atlas|update_preview_upgrades" => HomeLabManager::ExecutionResult.new(
+            "atlas", "update_preview_upgrades", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "2 packages can be upgraded"),
+          "atlas|update_apply_upgrades" => HomeLabManager::ExecutionResult.new(
+            "atlas", "update_apply_upgrades", HomeLabManager::OperationStatus::Succeeded, exit_code: 0, summary: "packages upgraded"),
+          "atlas|update_check_reboot_required" => HomeLabManager::ExecutionResult.new(
+            "atlas", "update_check_reboot_required", HomeLabManager::OperationStatus::Failed, exit_code: 1, summary: "flag absent"),
+          "backup|update_refresh_package_index" => HomeLabManager::ExecutionResult.new(
+            "backup", "update_refresh_package_index", HomeLabManager::OperationStatus::Failed, exit_code: 100, summary: "apt failed"),
+        },
+      )
+
+      exit_code = HomeLabManager::CLI.run(
+        ["updates", "run", path, "--approve", "--execute"],
+        stdout,
+        stderr,
+        transport,
+        HomeLabManager::Audit::NullLogger.new,
+      )
+
+      exit_code.should eq(1)
+      stdout.to_s.should contain("Update run: 2 host(s)")
+      stdout.to_s.should contain("- atlas")
+      stdout.to_s.should contain("reboot_required: false")
+      stdout.to_s.should contain("- backup")
+      stdout.to_s.should contain("overall_status: partial")
+      stdout.to_s.should contain("Summary: 1 succeeded, 1 partial, 0 failed")
       stderr.to_s.should eq("")
     end
   end

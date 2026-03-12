@@ -125,6 +125,13 @@ shards run homelab_manager -- updates dry-run --tag updates
 shards run homelab_manager -- updates dry-run --approve
 ```
 
+Execute the full update workflow only when you explicitly opt in:
+
+```sh
+shards run homelab_manager -- updates run --approve --execute
+shards run homelab_manager -- updates run --group lab --approve --execute
+```
+
 ## Inventory Format
 
 Phase 1 currently provides a validated YAML inventory baseline for host definitions.
@@ -203,11 +210,22 @@ Phase 1 now also includes a dry-run execution path that runs only the non-mutati
 - Dry-run output reports per-host, per-step execution results and exit codes where available.
 - The command exits non-zero if any executed dry-run step fails.
 
+## Update Execution
+
+Phase 1 now includes the first real mutating runner for approved host updates.
+
+- `updates run` requires `--execute` so mutating actions are never triggered by accident.
+- Hosts that still require approval will keep the upgrade step blocked unless `--approve` is also provided.
+- Per-host execution stops after the first failed step and clearly marks later steps as skipped.
+- Execution output includes per-host overall status, per-step results, and reboot-required reporting when the host check completes.
+- The command exits non-zero when any host run includes a failed step.
+
 ## Audit Logging
 
 Audit logging is file-based for the MVP.
 
 - Dry-run execution writes JSON line entries to `logs/audit.log`.
+- Dry-run and real update execution both write JSON line entries to `logs/audit.log`.
 - Runtime logs are ignored by Git.
 - Log entries include timestamp, operator, host, action, approval state, exit status, and sanitized command/result summaries.
 - Sensitive-looking `password=`, `passwd=`, `token=`, and `secret=` values are redacted before being written.
@@ -228,10 +246,10 @@ Audit logging is file-based for the MVP.
 
 ## Next Milestones
 
-1. Add the real approval-gated mutating upgrade runner on top of the existing planner and dry-run path.
-2. Extend audit logging and operator reporting into richer host-by-host summaries.
-3. Add reboot-required reporting and partial-failure handling to the update execution flow.
-4. Keep the transport boundary testable while introducing real update orchestration.
+1. Extend the mutating runner with safer retry and resume behavior after partial failures.
+2. Add richer operator-facing summaries and possibly machine-readable output for multi-host runs.
+3. Expand audit logging and sanitization rules as more commands and outputs are introduced.
+4. Keep the transport boundary testable while evolving toward broader host-management operations.
 
 ## Notes
 

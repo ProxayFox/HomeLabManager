@@ -8,7 +8,8 @@ module HomeLabManager
     private record CommandOptions,
       path : String,
       selection : HostSelection,
-      approve : Bool
+      approve : Bool,
+      execute : Bool
 
     def run(args : Array(String), stdout : IO = STDOUT, stderr : IO = STDERR, transport : Transport = SshTransport.new, audit_logger : Audit::Logger = Audit::FileLogger.new) : Int32
       return print_help(stdout) if args.empty?
@@ -38,6 +39,7 @@ module HomeLabManager
       io.puts "  homelab_manager hosts check [inventory.yml] [--tag TAG] [--group GROUP]"
       io.puts "  homelab_manager updates plan [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
       io.puts "  homelab_manager updates dry-run [inventory.yml] [--tag TAG] [--group GROUP] [--approve]"
+      io.puts "  homelab_manager updates run [inventory.yml] [--tag TAG] [--group GROUP] [--approve] --execute"
       io.puts
       io.puts "Commands:"
       io.puts "  inventory validate   Validate the inventory file before any remote action"
@@ -52,6 +54,8 @@ module HomeLabManager
       io.puts "                       Supports repeated --tag and --group filters and optional --approve"
       io.puts "  updates dry-run      Execute only non-mutating update steps and write audit logs"
       io.puts "                       Supports repeated --tag and --group filters and optional --approve"
+      io.puts "  updates run          Execute the full update workflow, including approved mutating steps"
+      io.puts "                       Requires --execute and supports repeated --tag/--group filters plus optional --approve"
       exit_code
     end
 
@@ -126,35 +130,81 @@ module HomeLabManager
         return 1
       end
 
-      options = parse_command_options(args[1..], allow_approve: true)
-
-      case subcommand
-      when "plan"
-        inventory = Inventory.load(options.path)
-        hosts = Inventory.select_hosts(inventory, options.selection)
-        return print_empty_selection(stderr, options.selection) if hosts.empty?
-
-        plans = Updates.build_plans(inventory, hosts, options.approve)
-        print_update_plans(plans, stdout)
-        0
-      when "dry-run"
-        inventory = Inventory.load(options.path)
-        hosts = Inventory.select_hosts(inventory, options.selection)
-        return print_empty_selection(stderr, options.selection) if hosts.empty?
-
-        plans = Updates.build_plans(inventory, hosts, options.approve)
-        runs = Updates.dry_run(plans, transport, audit_logger)
-        print_update_runs(runs, stdout)
-        stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
-        Updates.successful?(runs) ? 0 : 1
-      else
-        stderr.puts "Unknown updates subcommand: #{subcommand}"
-        stderr.puts "Expected: plan, dry-run"
-        1
-      end
+      options = parse_command_options(args[1..], allow_approve: true, allow_execute: true)
+      handle_updates_subcommand(subcommand, options, stdout, stderr, transport, audit_logger)
     rescue ex : InventoryError
       print_inventory_errors(stderr, ex)
       1
+    end
+
+    private def handle_updates_subcommand(
+      subcommand : String,
+      options : CommandOptions,
+      stdout : IO,
+      stderr : IO,
+      transport : Transport,
+      audit_logger : Audit::Logger,
+    ) : Int32
+      case subcommand
+      when "plan"
+        run_updates_plan(options, stdout, stderr)
+      when "dry-run"
+        run_updates_dry_run(options, stdout, stderr, transport, audit_logger)
+      when "run"
+        run_updates_execute(options, stdout, stderr, transport, audit_logger)
+      else
+        stderr.puts "Unknown updates subcommand: #{subcommand}"
+        stderr.puts "Expected: plan, dry-run, run"
+        1
+      end
+    end
+
+    private def load_selected_hosts(options : CommandOptions, stderr : IO) : Tuple(InventoryFile, Array(Host))?
+      inventory = Inventory.load(options.path)
+      hosts = Inventory.select_hosts(inventory, options.selection)
+      return nil if hosts.empty? && print_empty_selection(stderr, options.selection) == 1
+
+      {inventory, hosts}
+    end
+
+    private def run_updates_plan(options : CommandOptions, stdout : IO, stderr : IO) : Int32
+      loaded = load_selected_hosts(options, stderr)
+      return 1 unless loaded
+
+      inventory, hosts = loaded
+      plans = Updates.build_plans(inventory, hosts, options.approve)
+      print_update_plans(plans, stdout)
+      0
+    end
+
+    private def run_updates_dry_run(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger) : Int32
+      loaded = load_selected_hosts(options, stderr)
+      return 1 unless loaded
+
+      inventory, hosts = loaded
+      plans = Updates.build_plans(inventory, hosts, options.approve)
+      runs = Updates.dry_run(plans, transport, audit_logger)
+      print_update_runs("Update dry-run", runs, stdout)
+      stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
+      Updates.successful?(runs) ? 0 : 1
+    end
+
+    private def run_updates_execute(options : CommandOptions, stdout : IO, stderr : IO, transport : Transport, audit_logger : Audit::Logger) : Int32
+      unless options.execute
+        stderr.puts "Refusing to run mutating updates without --execute"
+        stderr.puts "Use updates plan or updates dry-run first, then rerun with --execute when ready"
+        return 1
+      end
+
+      loaded = load_selected_hosts(options, stderr)
+      return 1 unless loaded
+
+      inventory, hosts = loaded
+      plans = Updates.build_plans(inventory, hosts, options.approve)
+      runs = Updates.execute(plans, transport, audit_logger)
+      print_update_runs("Update run", runs, stdout)
+      stdout.puts "Audit log: #{Audit::DEFAULT_LOG_PATH}" if audit_logger.is_a?(Audit::FileLogger)
+      Updates.successful?(runs) ? 0 : 1
     end
 
     private def print_inventory_list(inventory : InventoryFile, hosts : Array(Host), io : IO) : Nil
@@ -212,12 +262,14 @@ module HomeLabManager
       end
     end
 
-    private def print_update_runs(runs : Array(UpdateRun), io : IO) : Nil
-      io.puts "Update dry-run: #{runs.size} host(s)"
+    private def print_update_runs(title : String, runs : Array(UpdateRun), io : IO) : Nil
+      io.puts "#{title}: #{runs.size} host(s)"
 
       runs.each do |run|
         io.puts "- #{run.host.name}"
+        io.puts "  overall_status: #{run.overall_status}"
         io.puts "  approval_state: #{run.approval_state.to_s.downcase}"
+        io.puts "  reboot_required: #{run.reboot_required}" unless run.reboot_required.nil?
 
         run.step_results.each do |result|
           io.puts "  action: #{result.action} [#{result.status.to_s.downcase}]"
@@ -227,13 +279,19 @@ module HomeLabManager
           end
         end
       end
+
+      succeeded_count = runs.count(&.successful?)
+      partial_count = runs.count(&.partially_failed?)
+      failed_count = runs.size - succeeded_count - partial_count
+      io.puts "Summary: #{succeeded_count} succeeded, #{partial_count} partial, #{failed_count} failed"
     end
 
-    private def parse_command_options(args : Array(String), allow_approve : Bool = false) : CommandOptions
+    private def parse_command_options(args : Array(String), allow_approve : Bool = false, allow_execute : Bool = false) : CommandOptions
       path = nil
       tags = [] of String
       groups = [] of String
       approve = false
+      execute = false
       index = 0
 
       while index < args.size
@@ -257,6 +315,11 @@ module HomeLabManager
 
           approve = true
           index += 1
+        when "--execute"
+          raise InventoryError.new(["--execute is not supported for this command"]) unless allow_execute
+
+          execute = true
+          index += 1
         else
           if argument.starts_with?("--")
             raise InventoryError.new(["unknown option: #{argument}"])
@@ -271,7 +334,7 @@ module HomeLabManager
         end
       end
 
-      CommandOptions.new(path || DEFAULT_INVENTORY_PATH, HostSelection.new(tags, groups), approve)
+      CommandOptions.new(path || DEFAULT_INVENTORY_PATH, HostSelection.new(tags, groups), approve, execute)
     end
 
     private def print_empty_selection(stderr : IO, selection : HostSelection) : Int32
