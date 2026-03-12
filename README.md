@@ -74,6 +74,8 @@ Run the test suite:
 crystal spec
 ```
 
+`crystal spec` also runs Ameba through [spec/ameba_spec.cr](spec/ameba_spec.cr), so the test pass now includes static analysis.
+
 Validate an inventory file before any remote work begins:
 
 ```sh
