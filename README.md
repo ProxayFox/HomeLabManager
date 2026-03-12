@@ -47,6 +47,19 @@ Install Crystal 1.19.1 or newer, then run:
 shards install
 ```
 
+## Documentation
+
+Repository-local implementation docs now live under [wiki/](wiki/README.md).
+
+- Start with [wiki/README.md](wiki/README.md) for the docs index.
+- See [wiki/architecture.md](wiki/architecture.md) for module responsibilities and extension points.
+- See [wiki/command-flow.md](wiki/command-flow.md) for CLI-to-runtime execution flow.
+- See [wiki/development-guide.md](wiki/development-guide.md) for development and testing conventions.
+- See [wiki/inventory-model.md](wiki/inventory-model.md) for inventory structure and selection semantics.
+- See [wiki/testing-strategy.md](wiki/testing-strategy.md) for spec organization and test doubles.
+- See [wiki/cli-behavior.md](wiki/cli-behavior.md) for command parsing, output modes, and error handling.
+- See [wiki/update-recovery.md](wiki/update-recovery.md) for persisted recovery state and resume behavior.
+
 ## Common Commands
 
 Run the app through the target defined in [shard.yml](shard.yml):
@@ -273,7 +286,7 @@ Inventory, connectivity, and update commands now support machine-readable JSON o
 ```text
 .
 ├── .devcontainer/        # Devcontainer configuration
-├── .github/              # Workspace-specific Copilot instructions and prompts
+├── .github/              # Copilot instructions, prompts, and local planning docs
 ├── config/               # Example inventory and local operator config location
 ├── spec/                 # Test files
 ├── src/                  # Application source
