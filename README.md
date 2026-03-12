@@ -87,6 +87,12 @@ List the hosts defined in an inventory file:
 shards run homelab_manager -- inventory list
 ```
 
+Run a non-mutating SSH connectivity check across the inventory:
+
+```sh
+shards run homelab_manager -- hosts check
+```
+
 ## Inventory Format
 
 Phase 1 currently provides a validated YAML inventory baseline for host definitions.
@@ -129,6 +135,15 @@ Current validation rules:
 - Host names must be unique within the inventory file.
 - Inventory validation must succeed before later SSH-based features are allowed to run.
 - Copy `config/inventory.example.yml` to `config/inventory.yml` before adding real host data.
+
+## Connectivity Checks
+
+Phase 1 now includes a read-only connectivity command that probes each host over SSH without performing package or configuration changes.
+
+- `hosts check` uses the operator's existing SSH keys or SSH agent.
+- Checks run sequentially and report per-host success or failure.
+- The command exits non-zero if any host fails the connectivity probe.
+- SSH probing is isolated behind a transport boundary so orchestration can be tested without real SSH targets.
 
 ## Project Structure
 
